@@ -1,0 +1,5 @@
+{
+  "name": "FitGenius AI",
+  "description": "An intelligent fitness companion that tracks your workouts, generates personalized training plans using Gemini AI, and provides data-driven coaching feedback.",
+  "requestFramePermissions": []
+}
