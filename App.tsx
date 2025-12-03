@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { WorkoutLogger } from './components/WorkoutLogger';
@@ -50,7 +51,32 @@ const App: React.FC = () => {
     setSyncStatus('syncing');
     try {
         await backend.addWorkoutLog(newLog);
-        setLogs(prev => [newLog, ...prev]);
+        
+        // Optimistic Update: Check if log for this date exists to merge locally
+        setLogs(prevLogs => {
+            const newLogDate = new Date(newLog.date).toDateString();
+            const existingIndex = prevLogs.findIndex(l => new Date(l.date).toDateString() === newLogDate);
+
+            if (existingIndex >= 0) {
+                // Merge with existing log
+                const updatedLogs = [...prevLogs];
+                const existing = updatedLogs[existingIndex];
+                
+                updatedLogs[existingIndex] = {
+                    ...existing,
+                    duration: existing.duration + newLog.duration,
+                    calories: existing.calories + newLog.calories,
+                    exercises: [...existing.exercises, ...newLog.exercises],
+                    // Optional: Append title or notes if needed, currently keeping original title
+                    notes: existing.notes + (newLog.notes ? ` | ${newLog.notes}` : '')
+                };
+                return updatedLogs;
+            } else {
+                // Add new log
+                return [newLog, ...prevLogs];
+            }
+        });
+
         setSyncStatus('synced');
         setTimeout(() => setSyncStatus('idle'), 3000);
     } catch (e) {
@@ -115,9 +141,7 @@ const App: React.FC = () => {
       });
     }
     
-    // Save simulated data to backend one by one or bulk (simplified here just updating state and local for now to keep demo fast)
-    // For proper demo, let's just update local state and assume backend sync happens or we manually push
-    // To make it persistent in our mock backend:
+    // Save simulated data to backend
     const reversedLogs = newLogs.reverse();
     for (const log of reversedLogs) {
         await backend.addWorkoutLog(log);
@@ -133,9 +157,6 @@ const App: React.FC = () => {
       case 'dashboard':
         return (
           <div className="space-y-8 animate-fade-in pb-20">
-             {/* Recent Logs List moved inside Dashboard or kept here? The previous design had it in Dashboard component? No, App.tsx had the list. 
-                 Let's keep the design consistent with the user's last state. 
-             */}
             <Dashboard logs={logs} />
             
             {/* Recent Logs List */}
@@ -198,42 +219,44 @@ const App: React.FC = () => {
     <div className="h-screen bg-[#F2F5F8] flex flex-col overflow-hidden font-sans text-slate-800">
       
       {/* Top Navigation Bar (Fixed) */}
-      <header className="bg-white/90 backdrop-blur-md border-b border-slate-200 shrink-0 z-30 h-14 flex items-center justify-between px-4">
-          <div className="flex items-center gap-3">
-              <button 
-                onClick={() => setIsProfileOpen(true)}
-                className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-xs font-bold text-slate-600 hover:bg-slate-200 transition overflow-hidden"
-              >
-                 {profile.name ? profile.name.charAt(0) : <UserIcon className="w-4 h-4"/>}
-              </button>
-              <h1 className="text-lg font-bold text-slate-900 tracking-tight">FitGenius</h1>
-          </div>
-          <div className="flex items-center gap-3">
-              {/* Cloud Sync Status */}
-              <div className="flex items-center gap-1.5 text-xs font-medium bg-slate-50 px-2 py-1 rounded-full border border-slate-100">
-                  {syncStatus === 'syncing' ? (
-                      <>
-                        <SyncIcon className="w-3.5 h-3.5 text-indigo-500 animate-spin" />
-                        <span className="text-indigo-500">同步中</span>
-                      </>
-                  ) : syncStatus === 'synced' ? (
-                      <>
-                        <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500" />
-                        <span className="text-emerald-500">已同步</span>
-                      </>
-                  ) : (
-                      <>
-                        <CloudIcon className="w-3.5 h-3.5 text-slate-400" />
-                        <span className="text-slate-400">云端</span>
-                      </>
-                  )}
-              </div>
+      <header className="bg-white/90 backdrop-blur-md border-b border-slate-200 shrink-0 z-30 h-14 px-4 sticky top-0">
+          <div className="max-w-3xl mx-auto w-full h-full flex items-center justify-between">
+            <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => setIsProfileOpen(true)}
+                  className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-xs font-bold text-slate-600 hover:bg-slate-200 transition overflow-hidden"
+                >
+                  {profile.name ? profile.name.charAt(0) : <UserIcon className="w-4 h-4"/>}
+                </button>
+                <h1 className="text-lg font-bold text-slate-900 tracking-tight">FitGenius</h1>
+            </div>
+            <div className="flex items-center gap-3">
+                {/* Cloud Sync Status */}
+                <div className="flex items-center gap-1.5 text-xs font-medium bg-slate-50 px-2 py-1 rounded-full border border-slate-100">
+                    {syncStatus === 'syncing' ? (
+                        <>
+                          <SyncIcon className="w-3.5 h-3.5 text-indigo-500 animate-spin" />
+                          <span className="text-indigo-500">同步中</span>
+                        </>
+                    ) : syncStatus === 'synced' ? (
+                        <>
+                          <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500" />
+                          <span className="text-emerald-500">已同步</span>
+                        </>
+                    ) : (
+                        <>
+                          <CloudIcon className="w-3.5 h-3.5 text-slate-400" />
+                          <span className="text-slate-400">云端</span>
+                        </>
+                    )}
+                </div>
+            </div>
           </div>
       </header>
 
       {/* Main Content Area (Scrollable) */}
       <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 pb-24 custom-scrollbar relative">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-3xl mx-auto w-full">
              {/* Page Title */}
              <div className="mb-6 mt-2">
                 <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-1">
@@ -254,36 +277,40 @@ const App: React.FC = () => {
       </main>
 
       {/* Bottom Tab Bar (Fixed) */}
-      <div className="bg-white border-t border-slate-200 shrink-0 h-[88px] pb-[20px] flex justify-around items-center px-2 z-40 relative">
-          <button onClick={() => setActiveView('dashboard')} className={`flex flex-col items-center gap-1 p-2 w-16 ${activeView === 'dashboard' ? 'text-indigo-600' : 'text-slate-400'}`}>
-              <HomeIcon className="w-6 h-6" />
-              <span className="text-[10px] font-bold">首页</span>
-          </button>
-          
-          <button onClick={() => setActiveView('exercises')} className={`flex flex-col items-center gap-1 p-2 w-16 ${activeView === 'exercises' ? 'text-indigo-600' : 'text-slate-400'}`}>
-              <DumbbellIcon className="w-6 h-6" />
-              <span className="text-[10px] font-bold">动作</span>
-          </button>
+      <div className="bg-white border-t border-slate-200 shrink-0 h-[88px] pb-[20px] z-40 relative w-full">
+        <div className="max-w-3xl mx-auto w-full h-full flex justify-around items-center px-2">
+           <div className="max-w-3xl mx-auto w-full h-full flex justify-around items-center px-2">
+            <button onClick={() => setActiveView('dashboard')} className={`flex flex-col items-center gap-1 p-2 w-16 ${activeView === 'dashboard' ? 'text-indigo-600' : 'text-slate-400'}`}>
+                <HomeIcon className="w-6 h-6" />
+                <span className="text-[10px] font-bold">首页</span>
+            </button>
+            
+            <button onClick={() => setActiveView('exercises')} className={`flex flex-col items-center gap-1 p-2 w-16 ${activeView === 'exercises' ? 'text-indigo-600' : 'text-slate-400'}`}>
+                <DumbbellIcon className="w-6 h-6" />
+                <span className="text-[10px] font-bold">动作</span>
+            </button>
 
-          {/* Floating Add Button in Center */}
-          <div className="relative -top-5">
-             <button 
-                onClick={() => setIsLoggerOpen(true)}
-                className="w-14 h-14 bg-indigo-600 rounded-full shadow-lg shadow-indigo-500/40 flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-all"
-             >
-                 <PlusIcon className="w-7 h-7" />
-             </button>
+            {/* Floating Add Button in Center */}
+            <div className="relative -top-5">
+              <button 
+                  onClick={() => setIsLoggerOpen(true)}
+                  className="w-14 h-14 bg-indigo-600 rounded-full shadow-lg shadow-indigo-500/40 flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-all"
+              >
+                  <PlusIcon className="w-7 h-7" />
+              </button>
+            </div>
+
+            <button onClick={() => setActiveView('report')} className={`flex flex-col items-center gap-1 p-2 w-16 ${activeView === 'report' ? 'text-indigo-600' : 'text-slate-400'}`}>
+                <AnalysisIcon className="w-6 h-6" />
+                <span className="text-[10px] font-bold">洞察</span>
+            </button>
+
+            <button onClick={() => setActiveView('coach')} className={`flex flex-col items-center gap-1 p-2 w-16 ${activeView === 'coach' ? 'text-indigo-600' : 'text-slate-400'}`}>
+                <BrainIcon className="w-6 h-6" />
+                <span className="text-[10px] font-bold">私教</span>
+            </button>
           </div>
-
-          <button onClick={() => setActiveView('report')} className={`flex flex-col items-center gap-1 p-2 w-16 ${activeView === 'report' ? 'text-indigo-600' : 'text-slate-400'}`}>
-              <AnalysisIcon className="w-6 h-6" />
-              <span className="text-[10px] font-bold">洞察</span>
-          </button>
-
-          <button onClick={() => setActiveView('coach')} className={`flex flex-col items-center gap-1 p-2 w-16 ${activeView === 'coach' ? 'text-indigo-600' : 'text-slate-400'}`}>
-              <BrainIcon className="w-6 h-6" />
-              <span className="text-[10px] font-bold">私教</span>
-          </button>
+        </div>
       </div>
 
       {/* Modals */}

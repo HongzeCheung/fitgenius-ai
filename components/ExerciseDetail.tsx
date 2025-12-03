@@ -14,8 +14,10 @@ export const ExerciseDetail: React.FC<ExerciseDetailProps> = ({ logs }) => {
   const [loadingInsight, setLoadingInsight] = useState(false);
   const [error, setError] = useState(false);
 
-  // Extract all unique exercises
-  const allExercises = Array.from(new Set(logs.flatMap(log => log.exercises.map(e => e.name))));
+  // Extract all unique exercises safely
+  const allExercises = Array.from(new Set(
+      (logs || []).flatMap(log => (log.exercises || []).map(e => e.name))
+  ));
   
   // Initial selection
   useEffect(() => {
@@ -53,25 +55,25 @@ export const ExerciseDetail: React.FC<ExerciseDetailProps> = ({ logs }) => {
   }
 
   // Prepare chart data
-  const exerciseHistory = logs
-    .filter(log => log.exercises.some(e => e.name === selectedExercise))
+  const exerciseHistory = (logs || [])
+    .filter(log => log.exercises && log.exercises.some(e => e.name === selectedExercise))
     .map(log => {
       const exerciseLog = log.exercises.find(e => e.name === selectedExercise);
       
       // Protect against empty sets or undefined logs to prevent -Infinity
-      const maxWeight = exerciseLog && exerciseLog.sets.length > 0 
-        ? Math.max(...exerciseLog.sets.map(s => s.weight)) 
+      const maxWeight = exerciseLog && exerciseLog.sets && exerciseLog.sets.length > 0 
+        ? Math.max(...exerciseLog.sets.map(s => Number(s.weight) || 0)) 
         : 0;
         
-      const totalVolume = exerciseLog 
-        ? exerciseLog.sets.reduce((acc, s) => acc + (s.weight * s.reps), 0) 
+      const totalVolume = exerciseLog && exerciseLog.sets
+        ? exerciseLog.sets.reduce((acc, s) => acc + ((Number(s.weight) || 0) * (Number(s.reps) || 0)), 0) 
         : 0;
         
-      const totalReps = exerciseLog 
-        ? exerciseLog.sets.reduce((acc, s) => acc + s.reps, 0) 
+      const totalReps = exerciseLog && exerciseLog.sets
+        ? exerciseLog.sets.reduce((acc, s) => acc + (Number(s.reps) || 0), 0) 
         : 0;
         
-      const totalSets = exerciseLog ? exerciseLog.sets.length : 0;
+      const totalSets = exerciseLog && exerciseLog.sets ? exerciseLog.sets.length : 0;
 
       return {
         date: new Date(log.date).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }),
@@ -167,9 +169,9 @@ export const ExerciseDetail: React.FC<ExerciseDetailProps> = ({ logs }) => {
         </select>
       </div>
 
-      {/* Main Charts Card */}
-      <div className="bg-white rounded-3xl border border-slate-100 p-6 md:p-8 shadow-sm">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+      {/* Main Charts Card - Forced Single Column */}
+      <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
+        <div className="flex flex-col justify-between items-start mb-8 gap-4">
            <div>
              <h3 className="text-lg font-bold text-slate-800 mb-2">动作进展追踪</h3>
              <div className="flex flex-wrap gap-2">
@@ -263,9 +265,9 @@ export const ExerciseDetail: React.FC<ExerciseDetailProps> = ({ logs }) => {
         </div>
       </div>
 
-      {/* AI Insights Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-3xl border border-slate-100 p-6 md:p-8 shadow-sm">
+      {/* AI Insights Section - Forced Single Column */}
+      <div className="grid grid-cols-1 gap-6">
+        <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
           <h3 className="text-slate-800 font-bold flex items-center gap-2 mb-6 text-lg">
              <span className="p-1.5 bg-yellow-100 rounded-lg text-yellow-600">
                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
@@ -275,7 +277,7 @@ export const ExerciseDetail: React.FC<ExerciseDetailProps> = ({ logs }) => {
           {renderInsightContent()}
         </div>
 
-        <div className="bg-white rounded-3xl border border-slate-100 p-6 md:p-8 shadow-sm relative overflow-hidden">
+        <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm relative overflow-hidden">
           <div className="absolute -right-10 -top-10 w-40 h-40 bg-purple-50 rounded-full blur-3xl z-0"></div>
           <h3 className="text-slate-800 font-bold flex items-center gap-2 mb-6 text-lg relative z-10">
              <span className="p-1.5 bg-purple-100 rounded-lg text-purple-600">

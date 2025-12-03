@@ -8,24 +8,34 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ logs }) => {
-  const totalWorkouts = logs.length;
-  const totalMinutes = logs.reduce((acc, log) => acc + log.duration, 0);
-  const totalCalories = logs.reduce((acc, log) => acc + log.calories, 0);
+  // Ensure logs is an array
+  const safeLogs = Array.isArray(logs) ? logs : [];
+  
+  const totalWorkouts = safeLogs.length;
+  // Use Number() to prevent string concatenation if data is malformed
+  const totalMinutes = safeLogs.reduce((acc, log) => acc + (Number(log.duration) || 0), 0);
+  const totalCalories = safeLogs.reduce((acc, log) => acc + (Number(log.calories) || 0), 0);
 
   // Prepare data for charts (last 7 entries)
-  const chartData = logs.slice(0, 7).reverse().map(log => ({
-    name: new Date(log.date).toLocaleDateString('zh-CN', { weekday: 'short' }),
-    calories: log.calories,
-    minutes: log.duration
-  }));
+  const chartData = safeLogs.slice(0, 7).reverse().map(log => {
+    try {
+        return {
+            name: new Date(log.date).toLocaleDateString('zh-CN', { weekday: 'short' }),
+            calories: Number(log.calories) || 0,
+            minutes: Number(log.duration) || 0
+        };
+    } catch (e) {
+        return { name: '-', calories: 0, minutes: 0 };
+    }
+  });
 
   // Activity Rings Data (Simulated Goals)
   const calorieGoal = 500;
   const durationGoal = 60;
   
   // Use the latest workout or average for the "Today" view simulation
-  const todayCalories = logs.length > 0 ? logs[0].calories : 0;
-  const todayDuration = logs.length > 0 ? logs[0].duration : 0;
+  const todayCalories = safeLogs.length > 0 ? (Number(safeLogs[0].calories) || 0) : 0;
+  const todayDuration = safeLogs.length > 0 ? (Number(safeLogs[0].duration) || 0) : 0;
 
   const ringsData = [
     { name: '目标', value: 100, fill: '#f1f5f9' }, // Placeholder background ring
@@ -35,11 +45,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs }) => {
 
   return (
     <div className="space-y-4 sm:space-y-8">
-      {/* Widgets Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6">
+      {/* Widgets Grid - Forced Single Column */}
+      <div className="grid grid-cols-1 gap-4 sm:gap-6">
         
         {/* Main Activity Widget (Rings) */}
-        <div className="md:col-span-5 lg:col-span-4 bg-white p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between relative overflow-hidden">
+        <div className="bg-white p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between relative overflow-hidden">
            <div className="flex items-center justify-between z-10">
              <div className="flex items-center gap-2">
                 <div className="p-2 bg-rose-50 rounded-full text-rose-500">
@@ -94,7 +104,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs }) => {
         </div>
 
         {/* Stats Widgets */}
-        <div className="md:col-span-7 lg:col-span-8 grid grid-cols-2 gap-3 sm:gap-6">
+        <div className="grid grid-cols-2 gap-3 sm:gap-6">
            {/* Total Workouts */}
            <div className="bg-white p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-center items-start group hover:shadow-md transition-all">
               <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-500 mb-4 group-hover:scale-110 transition-transform">
@@ -117,15 +127,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs }) => {
         </div>
       </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+      {/* Charts Section - Forced Single Column */}
+      <div className="grid grid-cols-1 gap-4 sm:gap-6">
         <div className="bg-white p-5 sm:p-8 rounded-3xl shadow-sm border border-slate-100">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-lg font-bold text-slate-800">热量趋势</h3>
             <span className="text-xs font-medium text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full">近7天</span>
           </div>
           <div className="h-56 sm:h-64 w-full">
-            {logs.length > 0 ? (
+            {safeLogs.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData} margin={{ left: 0, right: 10, top: 10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -150,7 +160,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs }) => {
             <span className="text-xs font-medium text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full">近7天</span>
           </div>
           <div className="h-56 sm:h-64 w-full">
-             {logs.length > 0 ? (
+             {safeLogs.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} barSize={16} margin={{ left: 0, right: 10, top: 10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
