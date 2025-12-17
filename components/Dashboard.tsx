@@ -33,9 +33,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs }) => {
   const calorieGoal = 500;
   const durationGoal = 60;
   
-  // Use the latest workout or average for the "Today" view simulation
-  const todayCalories = safeLogs.length > 0 ? (Number(safeLogs[0].calories) || 0) : 0;
-  const todayDuration = safeLogs.length > 0 ? (Number(safeLogs[0].duration) || 0) : 0;
+  // Logic to determine if "Today" has data
+  const todayDateStr = new Date().toDateString();
+  const latestLog = safeLogs.length > 0 ? safeLogs[0] : null;
+  const isLatestLogToday = latestLog ? new Date(latestLog.date).toDateString() === todayDateStr : false;
+
+  const todayCalories = isLatestLogToday ? (Number(latestLog?.calories) || 0) : 0;
+  const todayDuration = isLatestLogToday ? (Number(latestLog?.duration) || 0) : 0;
 
   const ringsData = [
     { name: '目标', value: 100, fill: '#f1f5f9' }, // Placeholder background ring

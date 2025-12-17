@@ -12,7 +12,7 @@ import { UserProfile, WorkoutLog, WorkoutPlan } from '../types';
 const USE_MOCK_BACKEND = false; 
 
 // 你的后端 API 地址
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = 'https://fit-backend-1jpe.onrender.com/';
 
 // ==========================================
 // 1. 真实后端实现 (Real REST API Client)
