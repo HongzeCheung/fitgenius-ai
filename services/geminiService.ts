@@ -1,28 +1,85 @@
+
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { UserProfile, WorkoutPlan, WorkoutLog, AIAdvice, TrainingReport, ExerciseInsight } from "../types";
 
 // Helper to get a fresh instance with the current key
 const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-// Schema for Plan Generation
+/**
+ * Simple SessionStorage Cache Helper
+ */
+export const Cache = {
+  get: (key: string) => {
+    try {
+      const data = sessionStorage.getItem(`fg_cache_${key}`);
+      return data ? JSON.parse(data) : null;
+    } catch {
+      return null;
+    }
+  },
+  set: (key: string, value: any) => {
+    try {
+      sessionStorage.setItem(`fg_cache_${key}`, JSON.stringify(value));
+    } catch (e) {
+      console.warn("Cache set failed", e);
+    }
+  },
+  // 生成稳定的缓存 Key
+  stableKey: (prefix: string, data: any) => {
+    const str = JSON.stringify(data);
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) - hash) + str.charCodeAt(i);
+      hash |= 0;
+    }
+    return `${prefix}_${hash}`;
+  }
+};
+
+/**
+ * Helper to handle API calls with exponential backoff for 429 errors.
+ */
+async function callWithRetry(fn: () => Promise<any>, maxRetries = 2): Promise<any> {
+  let lastError: any;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+      const errorMsg = error?.message || "";
+      const is429 = errorMsg.includes('429') || error?.status === 429 || error?.code === 429;
+      
+      if (is429) {
+        if (i === maxRetries - 1) throw error; // Last attempt
+        const delay = Math.pow(2, i) * 3000 + Math.random() * 1000;
+        console.warn(`Rate limit hit (429). Attempt ${i + 1}. Retrying in ${Math.round(delay)}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError;
+}
+
+// Model Selection: Flash has much higher quota (15 RPM) than Pro (2 RPM)
+const DEFAULT_MODEL = 'gemini-3-flash-preview';
+
+// Schemas
 const planSchema: Schema = {
   type: Type.OBJECT,
   properties: {
-    title: { type: Type.STRING, description: "训练计划标题" },
+    title: { type: Type.STRING, description: "计划标题，使用中文" },
     schedule: {
       type: Type.ARRAY,
       items: {
         type: Type.OBJECT,
         properties: {
-          day: { type: Type.STRING, description: "周几 (例如：周一)" },
-          focus: { type: Type.STRING, description: "训练重点 (例如：胸部力量)" },
-          exercises: { 
-            type: Type.ARRAY, 
-            items: { type: Type.STRING },
-            description: "具体动作列表"
-          },
-          duration: { type: Type.NUMBER, description: "预计时长(分钟)" },
-          notes: { type: Type.STRING, description: "注意事项" }
+          day: { type: Type.STRING, description: "星期几，如'周一'" },
+          focus: { type: Type.STRING, description: "当日重点，如'胸肌肥大'" },
+          exercises: { type: Type.ARRAY, items: { type: Type.STRING }, description: "动作列表，使用中文" },
+          duration: { type: Type.NUMBER },
+          notes: { type: Type.STRING, description: "动作要领或建议，使用中文" }
         },
         required: ["day", "focus", "exercises", "duration", "notes"]
       }
@@ -31,225 +88,157 @@ const planSchema: Schema = {
   required: ["title", "schedule"]
 };
 
-// Schema for Coach Analysis
 const adviceSchema: Schema = {
   type: Type.OBJECT,
   properties: {
-    summary: { type: Type.STRING, description: "近期表现总结" },
-    strengths: { 
-      type: Type.ARRAY, 
-      items: { type: Type.STRING }, 
-      description: "做的好的地方" 
-    },
-    improvements: { 
-      type: Type.ARRAY, 
-      items: { type: Type.STRING }, 
-      description: "需要改进的地方" 
-    },
-    nextStep: { type: Type.STRING, description: "下一次训练的具体建议" }
+    summary: { type: Type.STRING, description: "分析总结，使用中文" },
+    strengths: { type: Type.ARRAY, items: { type: Type.STRING }, description: "优势点列表，使用中文" },
+    improvements: { type: Type.ARRAY, items: { type: Type.STRING }, description: "改进方向列表，使用中文" },
+    nextStep: { type: Type.STRING, description: "下一步具体操作建议，使用中文" }
   },
   required: ["summary", "strengths", "improvements", "nextStep"]
 };
 
-// Schema for Detailed Report
 const reportSchema: Schema = {
   type: Type.OBJECT,
   properties: {
-    score: { type: Type.INTEGER, description: "0-100 评分" },
-    level: { type: Type.STRING, description: "评级 (例如: 优秀, 良好)" },
+    score: { type: Type.INTEGER },
+    level: { type: Type.STRING, description: "水平评价，如'优秀水平'，使用中文" },
     metrics: {
       type: Type.OBJECT,
       properties: {
-        consistency: { type: Type.INTEGER },
-        variety: { type: Type.INTEGER },
-        overload: { type: Type.INTEGER },
-        execution: { type: Type.INTEGER }
+        consistency: { type: Type.INTEGER }, variety: { type: Type.INTEGER },
+        overload: { type: Type.INTEGER }, execution: { type: Type.INTEGER }
       },
       required: ["consistency", "variety", "overload", "execution"]
     },
     muscleBalance: {
       type: Type.OBJECT,
       properties: {
-        push: { type: Type.INTEGER },
-        pull: { type: Type.INTEGER },
-        legs: { type: Type.INTEGER },
-        core: { type: Type.INTEGER }
+        push: { type: Type.INTEGER }, pull: { type: Type.INTEGER },
+        legs: { type: Type.INTEGER }, core: { type: Type.INTEGER }
       },
       required: ["push", "pull", "legs", "core"]
     },
     physiologicalAnalysis: {
       type: Type.OBJECT,
       properties: {
-        currentPhase: { type: Type.STRING },
-        currentPhaseDesc: { type: Type.STRING },
-        futureProjection: { type: Type.STRING },
-        futureProjectionDesc: { type: Type.STRING }
+        currentPhase: { type: Type.STRING, description: "当前生理/训练阶段名称，使用中文" }, 
+        currentPhaseDesc: { type: Type.STRING, description: "阶段描述，使用中文" },
+        futureProjection: { type: Type.STRING, description: "未来预期发展阶段名称，使用中文" }, 
+        futureProjectionDesc: { type: Type.STRING, description: "发展预期描述，使用中文" }
       },
       required: ["currentPhase", "currentPhaseDesc", "futureProjection", "futureProjectionDesc"]
     },
-    recommendations: { type: Type.ARRAY, items: { type: Type.STRING } }
+    recommendations: { type: Type.ARRAY, items: { type: Type.STRING }, description: "针对性的平衡建议列表，使用中文" }
   },
   required: ["score", "level", "metrics", "muscleBalance", "physiologicalAnalysis", "recommendations"]
 };
 
-// Schema for Exercise Insight
 const insightSchema: Schema = {
   type: Type.OBJECT,
   properties: {
     exerciseName: { type: Type.STRING },
-    targetMuscles: { type: Type.ARRAY, items: { type: Type.STRING } },
-    technicalPoints: { type: Type.ARRAY, items: { type: Type.STRING } },
-    physiologicalPrinciple: { type: Type.STRING }
+    targetMuscles: { type: Type.ARRAY, items: { type: Type.STRING }, description: "目标肌群名称列表，使用中文" },
+    technicalPoints: { type: Type.ARRAY, items: { type: Type.STRING }, description: "技术要点列表，使用中文" },
+    physiologicalPrinciple: { type: Type.STRING, description: "生物力学或生理学原理详细解释，使用中文" }
   },
   required: ["exerciseName", "targetMuscles", "technicalPoints", "physiologicalPrinciple"]
 };
 
 export const generateFitnessPlan = async (profile: UserProfile): Promise<WorkoutPlan | null> => {
-  try {
-    const ai = getAI();
-    const prompt = `
-      为以下用户制定一个7天的健身计划，请使用中文回答：
-      - 年龄: ${profile.age}
-      - 体重: ${profile.weight}kg
-      - 身高: ${profile.height}cm
-      - 目标: ${profile.goal}
-      - 水平: ${profile.fitnessLevel}
-      
-      计划应当切实可行，包含动作名称、组数次数建议。
-    `;
+  const cacheKey = Cache.stableKey('plan', { goal: profile.goal, level: profile.fitnessLevel, weight: profile.weight });
+  const cached = Cache.get(cacheKey);
+  if (cached) return cached;
 
+  return callWithRetry(async () => {
+    const ai = getAI();
+    const prompt = `你是一位专业的健身教练。请为健身水平为${profile.fitnessLevel}、体重${profile.weight}kg、身高${profile.height}cm、目标为${profile.goal}的用户制定一个为期7天的健身计划。所有回复内容必须完全使用中文。`;
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: DEFAULT_MODEL,
       contents: [{ parts: [{ text: prompt }] }],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: planSchema,
-        systemInstruction: "你是一个专业的健身教练。请只返回有效的 JSON 数据。"
-      }
+      config: { responseMimeType: "application/json", responseSchema: planSchema }
     });
 
     if (response.text) {
-      const data = JSON.parse(response.text);
-      return {
-        ...data,
-        goal: profile.goal
-      } as WorkoutPlan;
+      const result = { ...JSON.parse(response.text), goal: profile.goal };
+      Cache.set(cacheKey, result);
+      return result;
     }
     return null;
-  } catch (error) {
-    console.error("Error generating plan:", error);
-    return null;
-  }
+  }).catch(() => null);
 };
 
 export const analyzeWorkoutHistory = async (logs: WorkoutLog[], profile: UserProfile): Promise<AIAdvice | null> => {
-  try {
-    if (logs.length === 0) return null;
+  if (logs.length === 0) return null;
+  const lastLogDate = logs[0]?.date || '';
+  const cacheKey = Cache.stableKey('analysis', { logCount: logs.length, lastDate: lastLogDate, goal: profile.goal });
+  const cached = Cache.get(cacheKey);
+  if (cached) return cached;
+
+  return callWithRetry(async () => {
     const ai = getAI();
-
-    // Limit log size to prevent context overflow
-    const recentLogs = logs.slice(0, 8); 
-    const logsText = JSON.stringify(recentLogs.map(l => ({
-      date: l.date,
-      title: l.title,
-      exercises: l.exercises.map(e => ({ name: e.name, sets: e.sets.length }))
-    })));
-
-    const prompt = `
-      分析该用户最近的训练日志，目标是"${profile.goal}"。请使用中文回答。
-      用户水平: ${profile.fitnessLevel}。
-      日志摘要: ${logsText}
-      
-      请提供建设性的反馈，找出训练模式中的优点和缺点。
-    `;
-
+    const prompt = `分析近5次训练日志：${JSON.stringify(logs.slice(0, 5))}。用户目标：${profile.goal}。请评估其训练强度和一致性。所有分析结果必须完全使用中文提供。`;
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: DEFAULT_MODEL,
       contents: [{ parts: [{ text: prompt }] }],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: adviceSchema,
-        systemInstruction: "你是一个数据驱动的健身分析师，语气要专业且鼓励人心。"
-      }
+      config: { responseMimeType: "application/json", responseSchema: adviceSchema }
     });
 
     if (response.text) {
-      return JSON.parse(response.text) as AIAdvice;
+      const result = JSON.parse(response.text);
+      Cache.set(cacheKey, result);
+      return result;
     }
     return null;
-  } catch (error) {
-    console.error("Error analyzing history:", error);
-    return null;
-  }
+  }).catch(() => null);
 };
 
 export const generateTrainingReport = async (logs: WorkoutLog[], profile: UserProfile): Promise<TrainingReport | null> => {
-  try {
+  if (logs.length === 0) return null;
+  const lastLogDate = logs[0]?.date || '';
+  const cacheKey = Cache.stableKey('report', { logCount: logs.length, lastDate: lastLogDate, age: profile.age, goal: profile.goal });
+  
+  const cached = Cache.get(cacheKey);
+  if (cached) return cached;
+
+  return callWithRetry(async () => {
     const ai = getAI();
-    // Simplified log structure for analysis to reduce token usage
-    const logsSummary = JSON.stringify(logs.slice(0, 10).map(l => ({
-       title: l.title,
-       exercises: l.exercises.map(e => e.name)
-    })));
-
-    const prompt = `
-      基于过去训练日志生成一份详细的训练分析报告。请使用中文。
-      用户资料: ${JSON.stringify(profile)}
-      日志摘要: ${logsSummary}
-      
-      1. 评分 (0-100) 和评级。
-      2. 评估以下指标 (0-100): 训练一致性 (consistency), 动作多样性 (variety), 渐进负荷 (overload), 技术执行估算 (execution)。
-      3. 分析肌群平衡 (push/pull/legs/core) 的百分比。
-      4. 生理学分析：判断当前处于什么训练阶段（如神经适应期、肌肥大期等），并预测未来发展。
-    `;
-
+    const prompt = `生成深度健身报告。总日志条数：${logs.length}。最后记录日期：${lastLogDate}。用户目标：${profile.goal}。年龄：${profile.age}。重点分析训练的一致性和超负荷原则的执行情况。请注意：报告中的所有描述、阶段名称（生理周期）和平衡性建议必须完全使用中文输出。`;
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: DEFAULT_MODEL,
       contents: [{ parts: [{ text: prompt }] }],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: reportSchema,
-        systemInstruction: "你是一位高级运动科学家，正在为运动员提供详细的生理学训练报告。"
-      }
+      config: { responseMimeType: "application/json", responseSchema: reportSchema }
     });
 
     if (response.text) {
-      return JSON.parse(response.text) as TrainingReport;
+      const result = JSON.parse(response.text);
+      Cache.set(cacheKey, result);
+      return result;
     }
     return null;
-  } catch (error) {
-    console.error("Error generating report:", error);
-    return null;
-  }
+  }).catch(() => null);
 };
 
 export const getExerciseInsight = async (exerciseName: string): Promise<ExerciseInsight | null> => {
-  try {
-    const ai = getAI();
-    const prompt = `
-      提供关于动作 "${exerciseName}" 的专业技术分析。请使用中文。
-      包含：
-      1. 目标肌群
-      2. 4-5个关键的技术要点（Technical Points），用于保持完美姿势。
-      3. 生理学原理（Physiological Principle），解释该动作如何刺激肌肉生长或力量提升。
-    `;
+  const cacheKey = `insight_v2_${exerciseName}`;
+  const cached = Cache.get(cacheKey);
+  if (cached) return cached;
 
+  return callWithRetry(async () => {
+    const ai = getAI();
+    const prompt = `提供动作 "${exerciseName}" 的生物力学分析。请列出技术要点、目标肌群以及生理学原理。所有解释请务必使用中文。`;
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: DEFAULT_MODEL,
       contents: [{ parts: [{ text: prompt }] }],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: insightSchema,
-        systemInstruction: "你是一位生物力学专家。"
-      }
+      config: { responseMimeType: "application/json", responseSchema: insightSchema }
     });
 
     if (response.text) {
-      return JSON.parse(response.text) as ExerciseInsight;
+      const result = JSON.parse(response.text);
+      Cache.set(cacheKey, result);
+      return result;
     }
     return null;
-  } catch (error) {
-    console.error("Error getting insight:", error);
-    return null;
-  }
+  }).catch(() => null);
 };

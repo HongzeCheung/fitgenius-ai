@@ -1,20 +1,75 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# FitGenius AI - 您的智能健身进化引擎 🚀
 
-# Run and deploy your AI Studio app
+> **产品定位**：结合 Google Gemini 大语言模型与运动科学，为健身爱好者提供“计划-执行-复盘”全闭环的智能陪练平台。
 
-This contains everything you need to run your app locally.
+---
 
-View your app in AI Studio: https://ai.studio/apps/drive/1zLH9jH0u3aSXXgsbfWqtdthiiDjmD2Lc
+## 🌟 核心功能亮点
 
-## Run Locally
+### 1. 行为中心 (Action Hub)
+*   **活动闭环图表**：参考 Apple Watch 交互逻辑，通过双环设计实时展示今日“卡路里消耗”与“锻炼时长”进度。
+*   **多维趋势分析**：基于 Recharts 构建的动态热量折线图与时长柱状图，精准捕捉近 7 天的训练波动。
+*   **智能数据合并**：系统自动识别同日期记录，重复提交将自动执行“增量合并”算法，确保当日训练量的完整性。
 
-**Prerequisites:**  Node.js
+### 2. AI 智能计划 (AI Coach)
+*   **个性化定制**：深度集成 **Gemini 3 系列模型**，根据用户的 BMI、体质、健身目标（增肌/减脂/耐力）及当前水平，生成结构化的 7 天训练蓝图。
+*   **计划持久化**：支持“预览-确认”流程。一旦用户确认 AI 生成的计划，将永久同步至云端数据库。
 
+### 3. 深度训练洞察 (Deep Insights)
+*   **多维度评分系统**：从一致性、动作多样性、渐进超负荷、技术执行四个维度对用户进行 0-100 的量化评分。
+*   **肌群平衡分析**：AI 自动解析过往日志，直观展示“上肢推/拉”、“下肢”、“核心”的训练占比，并提供平衡性纠偏建议。
+*   **生理周期预测**：基于生物力学原理，分析用户当前所处的训练阶段（如：神经适应期、肌肉增长期）及未来预期发展。
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### 4. 动作库与生物力学 (Exercise Encyclopedia)
+*   **动作百科**：自动提取日志中的所有动作，针对单一动作提供由 AI 驱动的生物力学分析。
+*   **技术要点导航**：包含精准的肌肉定位、技术执行细节及底层生理学原理。
+*   **容量追踪**：针对特定动作追踪“最大重量”与“总训练容量”的动态变化。
+
+---
+
+## 📖 用户使用手册
+
+### 第一步：初始化个人画像
+1.  点击顶部导航栏左侧的**个人头像**或右侧的**设置齿轮**。
+2.  准确填写您的身高、体重、健身目标及水平。
+    *   *注：AI 的所有建议与计划均高度依赖这些基础数据的准确性。*
+
+### 第二步：记录日常训练
+1.  点击底部导航栏中央的 **[+] 按钮**。
+2.  输入训练标题、动作细节。
+3.  **智能热量计算**：点击热量字段旁的 `(i)` 图标。系统将根据 MET (Metabolic Equivalent of Task) 公式，结合您的体重与训练时长自动推算消耗。
+4.  点击“保存记录”，数据将实时同步至云端。
+
+### 第三步：获取 AI 进阶指导
+1.  **制定计划**：进入“私教”标签页，点击“立即生成”，获得专属周计划并点击“保存”。
+2.  **深度复盘**：在“洞察”标签页，查看由 AI 自动汇总的近期表现报告。
+    *   *性能提示：为了节省您的 API 额度，分析结果会在本地 Session 自动缓存。仅当您新增训练记录后，报告才会重新生成。*
+
+### 第四步：进阶动作分析
+1.  切换至“动作”标签页。
+2.  在下拉菜单中选择您关心的动作（如：杠铃卧推）。
+3.  查看您的重量增长曲线，并学习 AI 提供的生物力学技术要点。
+
+---
+
+## 🛠 技术架构 (Tech Stack)
+
+*   **Frontend**: React 19 + TypeScript + Tailwind CSS
+*   **AI Engine**: Google Gemini API (gemini-3-flash-preview)
+*   **Visualization**: Recharts
+*   **Backend**: Node.js + Express (支持 RESTful API)
+*   **Database**: MongoDB Atlas
+*   **Deployment**: Vercel (Frontend) + Render (Backend)
+
+---
+
+## ⚠️ 开发与部署说明
+
+1.  **模式切换**：
+    *   本地测试：修改 `services/backend.ts` 中的 `USE_MOCK_BACKEND = true` 即可快速预览。
+    *   全栈上线：将 `USE_MOCK_BACKEND = false` 并配置 `PRODUCTION_API_URL` 为您的后端 Render 地址。
+2.  **API Key**：
+    *   请确保环境中有有效的 `process.env.API_KEY` 以驱动 Gemini AI 功能。
+3.  **后端部署**：
+    *   将 `server.js` 和 `package.json` 部署至 Render。
+    *   在 Render 环境变量中配置 `MONGO_URI` 指向您的 MongoDB 实例。
