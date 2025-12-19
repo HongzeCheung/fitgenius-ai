@@ -1,7 +1,8 @@
+
 import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, RadialBarChart, RadialBar, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, RadialBarChart, RadialBar } from 'recharts';
 import { WorkoutLog } from '../types';
-import { ActivityIcon, CalendarIcon } from './Icons';
+import { ActivityIcon } from './Icons';
 
 interface DashboardProps {
   logs: WorkoutLog[];
@@ -12,37 +13,51 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs }) => {
   const safeLogs = Array.isArray(logs) ? logs : [];
   
   const totalWorkouts = safeLogs.length;
-  // Use Number() to prevent string concatenation if data is malformed
   const totalMinutes = safeLogs.reduce((acc, log) => acc + (Number(log.duration) || 0), 0);
-  const totalCalories = safeLogs.reduce((acc, log) => acc + (Number(log.calories) || 0), 0);
 
-  // Prepare data for charts (last 7 entries)
-  const chartData = safeLogs.slice(0, 7).reverse().map(log => {
-    try {
-        return {
-            name: new Date(log.date).toLocaleDateString('zh-CN', { weekday: 'short' }),
-            calories: Number(log.calories) || 0,
-            minutes: Number(log.duration) || 0
-        };
-    } catch (e) {
-        return { name: '-', calories: 0, minutes: 0 };
+  /**
+   * 核心逻辑：生成最近 7 天的连续数据
+   * 即使某天没有训练，也应该显示 0，而不是用更早的历史记录填充
+   */
+  const generateLast7DaysData = () => {
+    const data = [];
+    const now = new Date();
+    
+    // 创建一个从 6 天前到今天的日期数组
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toDateString();
+      const dayLabel = d.toLocaleDateString('zh-CN', { weekday: 'short' });
+      
+      // 查找当天的所有日志并加总（支持一天多次训练合并显示）
+      const dayLogs = safeLogs.filter(log => new Date(log.date).toDateString() === dateStr);
+      
+      const dayCalories = dayLogs.reduce((acc, log) => acc + (Number(log.calories) || 0), 0);
+      const dayMinutes = dayLogs.reduce((acc, log) => acc + (Number(log.duration) || 0), 0);
+      
+      data.push({
+        name: dayLabel,
+        calories: dayCalories,
+        minutes: dayMinutes,
+        fullDate: d.toLocaleDateString('zh-CN')
+      });
     }
-  });
+    return data;
+  };
+
+  const chartData = generateLast7DaysData();
 
   // Activity Rings Data (Simulated Goals)
   const calorieGoal = 500;
   const durationGoal = 60;
   
-  // Logic to determine if "Today" has data
-  const todayDateStr = new Date().toDateString();
-  const latestLog = safeLogs.length > 0 ? safeLogs[0] : null;
-  const isLatestLogToday = latestLog ? new Date(latestLog.date).toDateString() === todayDateStr : false;
-
-  const todayCalories = isLatestLogToday ? (Number(latestLog?.calories) || 0) : 0;
-  const todayDuration = isLatestLogToday ? (Number(latestLog?.duration) || 0) : 0;
+  // 今日数据（图表数组的最后一项就是今天）
+  const todayStats = chartData[chartData.length - 1];
+  const todayCalories = todayStats.calories;
+  const todayDuration = todayStats.minutes;
 
   const ringsData = [
-    { name: '目标', value: 100, fill: '#f1f5f9' }, // Placeholder background ring
     { name: '卡路里', value: Math.min((todayCalories / calorieGoal) * 100, 100), fill: '#f97316' },
     { name: '时长', value: Math.min((todayDuration / durationGoal) * 100, 100), fill: '#10b981' }
   ];
@@ -139,22 +154,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs }) => {
             <span className="text-xs font-medium text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full">近7天</span>
           </div>
           <div className="h-56 sm:h-64 w-full">
-            {safeLogs.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ left: 0, right: 10, top: 10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="name" stroke="#94a3b8" tick={{fontSize: 11}} axisLine={false} tickLine={false} dy={10} />
-                  <YAxis stroke="#94a3b8" tick={{fontSize: 11}} axisLine={false} tickLine={false} width={40} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#fff', border: 'none', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', color: '#1e293b' }}
-                    itemStyle={{ color: '#f97316', fontWeight: 600 }}
-                  />
-                  <Line type="monotone" dataKey="calories" stroke="#f97316" strokeWidth={3} dot={{ r: 4, fill: '#fff', stroke: '#f97316', strokeWidth: 2 }} activeDot={{ r: 6 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-               <div className="h-full flex items-center justify-center text-slate-400 text-sm">暂无数据</div>
-            )}
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ left: 0, right: 10, top: 10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="name" stroke="#94a3b8" tick={{fontSize: 11}} axisLine={false} tickLine={false} dy={10} />
+                <YAxis stroke="#94a3b8" tick={{fontSize: 11}} axisLine={false} tickLine={false} width={40} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#fff', border: 'none', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', color: '#1e293b' }}
+                  itemStyle={{ color: '#f97316', fontWeight: 600 }}
+                  labelFormatter={(name, payload) => payload[0]?.payload?.fullDate || name}
+                />
+                <Line type="monotone" dataKey="calories" stroke="#f97316" strokeWidth={3} dot={{ r: 4, fill: '#fff', stroke: '#f97316', strokeWidth: 2 }} activeDot={{ r: 6 }} />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
@@ -164,31 +176,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs }) => {
             <span className="text-xs font-medium text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full">近7天</span>
           </div>
           <div className="h-56 sm:h-64 w-full">
-             {safeLogs.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} barSize={16} margin={{ left: 0, right: 10, top: 10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="name" stroke="#94a3b8" tick={{fontSize: 11}} axisLine={false} tickLine={false} dy={10} />
-                  <YAxis 
-                    stroke="#94a3b8" 
-                    tick={{fontSize: 11}} 
-                    axisLine={false} 
-                    tickLine={false} 
-                    width={40} 
-                    tickFormatter={(value) => `${value}m`}
-                  />
-                  <Tooltip 
-                     cursor={{fill: 'rgba(0,0,0,0.02)'}}
-                     contentStyle={{ backgroundColor: '#fff', border: 'none', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', color: '#1e293b' }}
-                     itemStyle={{ color: '#6366f1', fontWeight: 600 }}
-                     formatter={(value: number) => [`${value} min`, '时长']}
-                  />
-                  <Bar dataKey="minutes" fill="#6366f1" radius={[10, 10, 10, 10]} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-               <div className="h-full flex items-center justify-center text-slate-400 text-sm">暂无数据</div>
-            )}
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} barSize={16} margin={{ left: 0, right: 10, top: 10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="name" stroke="#94a3b8" tick={{fontSize: 11}} axisLine={false} tickLine={false} dy={10} />
+                <YAxis 
+                  stroke="#94a3b8" 
+                  tick={{fontSize: 11}} 
+                  axisLine={false} 
+                  tickLine={false} 
+                  width={40} 
+                  tickFormatter={(value) => `${value}m`}
+                />
+                <Tooltip 
+                   cursor={{fill: 'rgba(0,0,0,0.02)'}}
+                   contentStyle={{ backgroundColor: '#fff', border: 'none', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', color: '#1e293b' }}
+                   itemStyle={{ color: '#6366f1', fontWeight: 600 }}
+                   formatter={(value: number) => [`${value} min`, '时长']}
+                   labelFormatter={(name, payload) => payload[0]?.payload?.fullDate || name}
+                />
+                <Bar dataKey="minutes" fill="#6366f1" radius={[10, 10, 10, 10]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
       </div>
