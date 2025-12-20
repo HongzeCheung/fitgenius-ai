@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 export const ActivityIcon = ({ className }: { className?: string }) => (
@@ -32,7 +33,7 @@ export const BrainIcon = ({ className }: { className?: string }) => (
 
 export const DumbbellIcon = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M20.893 13.393l-1.135-1.135a2.252 2.252 0 01-.421-.585l-1.08-2.16a.414.414 0 00-.663-.107.827.827 0 01-.812.21l-1.273-.318a.75.75 0 01-.563-.727v-1.36a.75.75 0 00-1.5 0v1.36c0 .31-.192.594-.492.727l-1.273.318a.827.827 0 01-.812-.21.414.414 0 00-.663.107l-1.08 2.16a2.25 2.25 0 01-.421.585l-1.135 1.135a2.25 2.25 0 01-3.182 0l-2.95-2.95a2.25 2.25 0 010-3.182 2.25 2.25 0 013.182 0l2.95 2.95a2.25 2.25 0 010 3.182l1.135 1.135m0 0a2.25 2.25 0 003.182 0l2.95-2.95a2.25 2.25 0 000-3.182 2.25 2.25 0 00-3.182 0l-2.95 2.95a2.25 2.25 0 000 3.182l-1.135-1.135m-9.546-4.242l3.712 3.712" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M20.893 13.393l-1.135-1.135a2.252 2.252 0 01-.421-.585l-1.08-2.16a.414.414 0 00-.663-.107.827.827 0 01-.812.21l-1.273-.318a.75.75 0 01-.563-.727v-1.36a.75.75 0 01-.563-.727v-1.36a.75.75 0 00-1.5 0v1.36c0 .31-.192.594-.492.727l-1.273.318a.827.827 0 01-.812-.21.414.414 0 00-.663.107l-1.08 2.16a2.25 2.25 0 01-.421.585l-1.135 1.135a2.25 2.25 0 01-3.182 0l-2.95-2.95a2.25 2.25 0 010-3.182 2.25 2.25 0 013.182 0l2.95 2.95a2.25 2.25 0 010 3.182l1.135 1.135m0 0a2.25 2.25 0 003.182 0l2.95-2.95a2.25 2.25 0 000-3.182 2.25 2.25 0 00-3.182 0l-2.95 2.95a2.25 2.25 0 000 3.182l-1.135-1.135m-9.546-4.242l3.712 3.712" />
   </svg>
 );
 
@@ -75,5 +76,17 @@ export const SyncIcon = ({ className }: { className?: string }) => (
 export const CheckCircleIcon = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+
+export const LockIcon = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+  </svg>
+);
+
+export const LogOutIcon = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
   </svg>
 );

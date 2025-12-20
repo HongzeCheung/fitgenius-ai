@@ -14,137 +14,99 @@ const USE_MOCK_BACKEND = false;
 // 你的后端 API 地址
 const API_BASE_URL = 'https://fit-backend-1jpe.onrender.com/api';
 
-// ==========================================
-// 1. 真实后端实现 (Real REST API Client)
-// ==========================================
-const RealBackend = {
+const getHeaders = () => {
+  const token = localStorage.getItem('fg_token');
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+  };
+};
+
+const handleResponse = async (response: Response) => {
+  if (response.status === 401 || response.status === 403) {
+    localStorage.removeItem('fg_token');
+    window.location.reload(); // 触发 App 重新渲染到登录页
+    throw new Error('Unauthorized');
+  }
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || '请求失败');
+  }
+  return response.json();
+};
+
+export const backend = {
+  // Auth
+  async login(username: string, password: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await handleResponse(response);
+    if (data.token) localStorage.setItem('fg_token', data.token);
+    return data;
+  },
+
+  async register(username: string, password: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await handleResponse(response);
+    if (data.token) localStorage.setItem('fg_token', data.token);
+    return data;
+  },
+
+  logout() {
+    localStorage.removeItem('fg_token');
+  },
+
+  hasToken() {
+    return !!localStorage.getItem('fg_token');
+  },
+
+  // Data
   async getUserProfile(): Promise<UserProfile | null> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/profile`);
-      if (!response.ok) throw new Error('Network response was not ok');
-      return await response.json();
-    } catch (error) {
-      console.error("Failed to fetch profile:", error);
-      return null;
-    }
+    const response = await fetch(`${API_BASE_URL}/profile`, { headers: getHeaders() });
+    return handleResponse(response).catch(() => null);
   },
 
   async saveUserProfile(profile: UserProfile): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/profile`, {
-      method: 'POST', // or PUT
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: getHeaders(),
       body: JSON.stringify(profile),
     });
-    if (!response.ok) throw new Error('Failed to save profile');
+    await handleResponse(response);
   },
 
   async getWorkoutLogs(): Promise<WorkoutLog[]> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/logs`);
-      if (!response.ok) throw new Error('Network response was not ok');
-      return await response.json();
-    } catch (error) {
-      console.error("Failed to fetch logs:", error);
-      return [];
-    }
+    const response = await fetch(`${API_BASE_URL}/logs`, { headers: getHeaders() });
+    return handleResponse(response).catch(() => []);
   },
 
   async addWorkoutLog(log: WorkoutLog): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/logs`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHeaders(),
       body: JSON.stringify(log),
     });
-    if (!response.ok) throw new Error('Failed to add log');
+    await handleResponse(response);
   },
 
   async getActivePlan(): Promise<WorkoutPlan | null> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/plan`);
-      if (response.status === 404) return null; // No plan found
-      if (!response.ok) throw new Error('Network response was not ok');
-      return await response.json();
-    } catch (error) {
-      console.error("Failed to fetch plan:", error);
-      return null;
-    }
+    const response = await fetch(`${API_BASE_URL}/plan`, { headers: getHeaders() });
+    return handleResponse(response).catch(() => null);
   },
 
   async saveActivePlan(plan: WorkoutPlan): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/plan`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHeaders(),
       body: JSON.stringify(plan),
     });
-    if (!response.ok) throw new Error('Failed to save plan');
+    await handleResponse(response);
   }
 };
-
-// ==========================================
-// 2. 模拟后端实现 (Mock / LocalStorage)
-// ==========================================
-const NETWORK_DELAY = 600; // ms
-
-const MockBackend = {
-  async getUserProfile(): Promise<UserProfile | null> {
-    await new Promise(resolve => setTimeout(resolve, NETWORK_DELAY));
-    const data = localStorage.getItem('fg_profile');
-    return data ? JSON.parse(data) : null;
-  },
-
-  async saveUserProfile(profile: UserProfile): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, NETWORK_DELAY));
-    localStorage.setItem('fg_profile', JSON.stringify(profile));
-  },
-
-  async getWorkoutLogs(): Promise<WorkoutLog[]> {
-    await new Promise(resolve => setTimeout(resolve, NETWORK_DELAY));
-    const data = localStorage.getItem('fg_logs');
-    return data ? JSON.parse(data) : [];
-  },
-
-  async addWorkoutLog(log: WorkoutLog): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, NETWORK_DELAY));
-    const currentLogsStr = localStorage.getItem('fg_logs');
-    let currentLogs: WorkoutLog[] = currentLogsStr ? JSON.parse(currentLogsStr) : [];
-    
-    // Check if log exists for the same day
-    const newLogDate = new Date(log.date).toDateString();
-    const existingIndex = currentLogs.findIndex(l => new Date(l.date).toDateString() === newLogDate);
-
-    if (existingIndex >= 0) {
-        // Merge logic
-        const existing = currentLogs[existingIndex];
-        const updatedLog = {
-            ...existing,
-            duration: existing.duration + log.duration,
-            calories: existing.calories + log.calories,
-            exercises: [...existing.exercises, ...log.exercises],
-            notes: existing.notes + (log.notes ? ` | ${log.notes}` : '')
-        };
-        // Update array
-        currentLogs[existingIndex] = updatedLog;
-    } else {
-        // Add new
-        currentLogs = [log, ...currentLogs];
-    }
-    
-    localStorage.setItem('fg_logs', JSON.stringify(currentLogs));
-  },
-
-  async getActivePlan(): Promise<WorkoutPlan | null> {
-    await new Promise(resolve => setTimeout(resolve, NETWORK_DELAY));
-    const data = localStorage.getItem('fg_active_plan');
-    return data ? JSON.parse(data) : null;
-  },
-
-  async saveActivePlan(plan: WorkoutPlan): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, NETWORK_DELAY));
-    localStorage.setItem('fg_active_plan', JSON.stringify(plan));
-  }
-};
-
-// ==========================================
-// Export
-// ==========================================
-export const backend = USE_MOCK_BACKEND ? MockBackend : RealBackend;
