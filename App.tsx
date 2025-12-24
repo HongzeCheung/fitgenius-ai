@@ -208,7 +208,7 @@ const App: React.FC = () => {
                     )}
                 </div>
                 <a 
-                  href="https://github.com" 
+                  href="https://github.com/HongzeCheung/fitgenius-ai" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all active:scale-90"
