@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { WorkoutLogger } from './components/WorkoutLogger';
@@ -7,7 +6,7 @@ import { AnalysisReport } from './components/AnalysisReport';
 import { ExerciseDetail } from './components/ExerciseDetail';
 import { Auth } from './components/Auth';
 import { WorkoutLog, UserProfile, GoalType } from './types';
-import { HomeIcon, DumbbellIcon, BrainIcon, UserIcon, PlusIcon, CloseIcon, CloudIcon, SyncIcon, CheckCircleIcon, AnalysisIcon, LogOutIcon,GithubIcon } from './components/Icons';
+import { HomeIcon, DumbbellIcon, BrainIcon, UserIcon, PlusIcon, CloseIcon, CloudIcon, SyncIcon, CheckCircleIcon, AnalysisIcon, LogOutIcon, GithubIcon } from './components/Icons';
 import { backend } from './services/backend';
 import { Spinner } from './components/Spinner';
 
@@ -49,7 +48,6 @@ const App: React.FC = () => {
         if (fetchedProfile) setProfile(fetchedProfile);
     } catch (e) {
         console.error("Initialization failed", e);
-        // 如果是鉴权失败，backend.ts 会处理重刷
     } finally {
         setIsAppLoading(false);
     }
@@ -128,9 +126,12 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (activeView) {
       case 'dashboard':
+        // 对日志进行排序，确保最近的在最上方
+        const sortedLogs = [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
         return (
           <div className="space-y-8 animate-fade-in pb-20">
-            <Dashboard logs={logs} />
+            <Dashboard logs={sortedLogs} />
             <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden mb-6">
                 <div className="p-6 border-b border-slate-50 flex justify-between items-center">
                   <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -139,11 +140,11 @@ const App: React.FC = () => {
                   </h3>
                 </div>
                 <div>
-                  {logs.length === 0 && (
+                  {sortedLogs.length === 0 && (
                       <div className="text-center py-12 text-slate-400 text-sm">暂无记录，点击下方 + 号开始记录</div>
                   )}
-                  {logs.slice(0, 5).map((log, idx) => (
-                    <div key={log.id} className={`flex items-center justify-between p-5 hover:bg-slate-50 transition-colors ${idx !== logs.slice(0, 5).length-1 ? 'border-b border-slate-50' : ''}`}>
+                  {sortedLogs.slice(0, 10).map((log, idx) => (
+                    <div key={log.id} className={`flex items-center justify-between p-5 hover:bg-slate-50 transition-colors ${idx !== Math.min(sortedLogs.length, 10) - 1 ? 'border-b border-slate-50' : ''}`}>
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-indigo-500 shadow-sm">
                             <DumbbellIcon className="w-6 h-6" />
@@ -207,7 +208,7 @@ const App: React.FC = () => {
                     )}
                 </div>
                 <a 
-                  href="https://github.com/HongzeCheung/fitgenius-ai" 
+                  href="https://github.com" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all active:scale-90"
