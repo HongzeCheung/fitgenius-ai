@@ -7,7 +7,7 @@ import { AnalysisReport } from './components/AnalysisReport';
 import { ExerciseDetail } from './components/ExerciseDetail';
 import { Auth } from './components/Auth';
 import { WorkoutLog, UserProfile, GoalType } from './types';
-import { HomeIcon, DumbbellIcon, BrainIcon, UserIcon, PlusIcon, CloseIcon, CloudIcon, SyncIcon, CheckCircleIcon, AnalysisIcon, LogOutIcon } from './components/Icons';
+import { HomeIcon, DumbbellIcon, BrainIcon, UserIcon, PlusIcon, CloseIcon, CloudIcon, SyncIcon, CheckCircleIcon, AnalysisIcon, LogOutIcon,GithubIcon } from './components/Icons';
 import { backend } from './services/backend';
 import { Spinner } from './components/Spinner';
 
@@ -206,6 +206,14 @@ const App: React.FC = () => {
                         </>
                     )}
                 </div>
+                <a 
+                  href="https://github.com" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all active:scale-90"
+                >
+                  <GithubIcon className="w-5 h-5" />
+                </a>
             </div>
           </div>
       </header>

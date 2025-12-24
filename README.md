@@ -1,7 +1,7 @@
 # FitGenius AI - 您的智能健身进化引擎 🚀
 
 > **产品定位**：结合 Google Gemini 大语言模型与运动科学，为健身爱好者提供“计划-执行-复盘”全闭环的智能陪练平台。
-在线体验地址：https://fitgenius-ai-three.vercel.app/
+在线体验地址：https://www.fitgenius.cloud/
 ---
 
 ## 🌟 核心功能亮点
