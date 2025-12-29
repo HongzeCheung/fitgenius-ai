@@ -26,10 +26,18 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
   const [weight, setWeight] = useState('');
   const [reps, setReps] = useState('');
   const [setsCount, setSetsCount] = useState('');
-  const [exDuration, setExDuration] = useState(''); // 单个有氧动作的时长
+  const [exDuration, setExDuration] = useState('');
   
   const [exercises, setExercises] = useState<ExerciseLog[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 辅助函数：仅允许数字输入
+  const handleNumericInput = (value: string, setter: (v: string) => void, allowFloat = false) => {
+    const regex = allowFloat ? /^\d*\.?\d*$/ : /^\d*$/;
+    if (regex.test(value)) {
+      setter(value);
+    }
+  };
 
   useEffect(() => {
     if (duration) {
@@ -57,7 +65,6 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
       newExercise = { name: exerciseName, type: 'strength', sets };
     } else {
       if (!exDuration) return;
-      // 有氧运动通常记录为 1 组，并带有时长
       const sets: ExerciseSet[] = [{
         weight: 0,
         reps: 0,
@@ -65,7 +72,6 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
       }];
       newExercise = { name: exerciseName, type: 'cardio', sets };
       
-      // 自动累加到总时长
       if (!duration) {
         setDuration(exDuration);
       } else {
@@ -129,11 +135,19 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">日期</label>
-              <input type="date" value={dateStr} onChange={e => setDateStr(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-indigo-500"/>
+              {/* 针对移动端优化的日期输入样式 */}
+              <div className="relative group">
+                <input 
+                  type="date" 
+                  value={dateStr} 
+                  onChange={e => setDateStr(e.target.value)} 
+                  className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500 appearance-none h-[48px]"
+                />
+              </div>
             </div>
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">训练标题</label>
-              <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="如：今日练腿" className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-indigo-500" required />
+              <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="如：今日练腿" className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500 h-[48px]" required />
             </div>
           </div>
           
@@ -164,21 +178,49 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
                <div className="grid grid-cols-3 gap-3">
                  <div>
                    <label className="block text-[9px] font-bold text-slate-400 mb-1 ml-1 uppercase">重量(kg)</label>
-                   <input placeholder="0=自重" type="number" value={weight} onChange={e=>setWeight(e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none"/>
+                   <input 
+                     placeholder="0=自重" 
+                     type="text" 
+                     inputMode="decimal"
+                     value={weight} 
+                     onChange={e=>handleNumericInput(e.target.value, setWeight, true)} 
+                     className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none"
+                   />
                  </div>
                  <div>
                    <label className="block text-[9px] font-bold text-slate-400 mb-1 ml-1 uppercase">次数</label>
-                   <input placeholder="次" type="number" value={reps} onChange={e=>setReps(e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none"/>
+                   <input 
+                     placeholder="次" 
+                     type="text" 
+                     inputMode="numeric"
+                     value={reps} 
+                     onChange={e=>handleNumericInput(e.target.value, setReps)} 
+                     className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none"
+                   />
                  </div>
                  <div>
                    <label className="block text-[9px] font-bold text-slate-400 mb-1 ml-1 uppercase">组数</label>
-                   <input placeholder="组" type="number" value={setsCount} onChange={e=>setSetsCount(e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none"/>
+                   <input 
+                     placeholder="组" 
+                     type="text" 
+                     inputMode="numeric"
+                     value={setsCount} 
+                     onChange={e=>handleNumericInput(e.target.value, setSetsCount)} 
+                     className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none"
+                   />
                  </div>
                </div>
              ) : (
                <div>
                  <label className="block text-[9px] font-bold text-slate-400 mb-1 ml-1 uppercase">持续时长 (分钟)</label>
-                 <input placeholder="请输入运动时长" type="number" value={exDuration} onChange={e=>setExDuration(e.target.value)} className="w-full bg-white border border-slate-200 rounded-2xl p-4 text-sm font-bold outline-none"/>
+                 <input 
+                    placeholder="请输入运动时长" 
+                    type="text" 
+                    inputMode="numeric"
+                    value={exDuration} 
+                    onChange={e=>handleNumericInput(e.target.value, setExDuration)} 
+                    className="w-full bg-white border border-slate-200 rounded-2xl p-4 text-sm font-bold outline-none"
+                 />
                </div>
              )}
 
@@ -194,7 +236,7 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
                         <span className={`w-1.5 h-1.5 rounded-full ${ex.type === 'strength' ? 'bg-indigo-400' : 'bg-emerald-400'}`}></span>
                         {ex.name}
                      </span>
-                     <span className="text-slate-500 font-bold bg-slate-50 px-2 py-1 rounded-lg">
+                     <span className="text-slate-500 font-bold bg-slate-50 px-2 py-1 rounded-lg text-[10px]">
                         {ex.type === 'strength' 
                           ? `${ex.sets.length}组 × ${ex.sets[0].reps}次 ${ex.sets[0].weight > 0 ? `@${ex.sets[0].weight}kg` : '(自重)'}`
                           : `${ex.sets[0].duration} 分钟`
@@ -209,11 +251,24 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">总时长 (min)</label>
-              <input type="number" value={duration} onChange={e => setDuration(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-indigo-500" required />
+              <input 
+                type="text" 
+                inputMode="numeric"
+                value={duration} 
+                onChange={e => handleNumericInput(e.target.value, setDuration)} 
+                className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500 h-[48px]" 
+                required 
+              />
             </div>
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">消耗 (kcal)</label>
-              <input type="number" value={calories} onChange={e => setCalories(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-indigo-500" />
+              <input 
+                type="text" 
+                inputMode="numeric"
+                value={calories} 
+                onChange={e => handleNumericInput(e.target.value, setCalories)} 
+                className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500 h-[48px]" 
+              />
             </div>
           </div>
           

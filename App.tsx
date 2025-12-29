@@ -110,6 +110,14 @@ const App: React.FC = () => {
     }
   };
 
+  // 数字校验辅助函数
+  const handleNumericInput = (val: string, key: keyof UserProfile) => {
+    const numeric = val.replace(/[^\d]/g, '');
+    if (numeric || val === '') {
+       setProfile({...profile, [key]: numeric === '' ? 0 : parseInt(numeric)});
+    }
+  };
+
   if (isAppLoading) {
       return (
           <div className="min-h-screen bg-[#F2F5F8] flex flex-col items-center justify-center space-y-4">
@@ -126,7 +134,6 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (activeView) {
       case 'dashboard':
-        // 对日志进行排序，确保最近的在最上方
         const sortedLogs = [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         
         return (
@@ -186,7 +193,7 @@ const App: React.FC = () => {
                 >
                   {profile.name ? profile.name.charAt(0) : <UserIcon className="w-4 h-4"/>}
                 </button>
-                <h1 className="text-lg font-bold text-slate-900 tracking-tight">FitGenius</h1>
+                <h1 className="text-lg font-bold text-slate-900 tracking-tight text-indigo-600">FitGenius</h1>
             </div>
             <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1.5 text-xs font-medium bg-slate-50 px-2 py-1 rounded-full border border-slate-100">
@@ -289,7 +296,7 @@ const App: React.FC = () => {
             </div>
             <form onSubmit={handleProfileUpdate} className="space-y-5">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-widest">昵称</label>
+                <label className="block text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-widest">昵称</label>
                 <input 
                   value={profile.name} 
                   onChange={e => setProfile({...profile, name: e.target.value})}
@@ -298,16 +305,33 @@ const App: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-widest">年龄</label>
-                  <input type="number" value={profile.age} onChange={e=>setProfile({...profile, age:parseInt(e.target.value)})} className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 outline-none font-bold" />
+                  <label className="block text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-widest">年龄</label>
+                  <input 
+                    type="text" 
+                    inputMode="numeric"
+                    value={profile.age || ''} 
+                    onChange={e=>handleNumericInput(e.target.value, 'age')} 
+                    className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 outline-none font-bold" 
+                  />
                 </div>
                 <div>
-                   <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-widest">目标</label>
-                   <select value={profile.goal} onChange={e=>setProfile({...profile, goal:e.target.value as any})} className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 outline-none font-bold">
-                     {Object.values(GoalType).map(g => <option key={g} value={g}>{g}</option>)}
-                   </select>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-widest">体重 (kg)</label>
+                  <input 
+                    type="text" 
+                    inputMode="numeric"
+                    value={profile.weight || ''} 
+                    onChange={e=>handleNumericInput(e.target.value, 'weight')} 
+                    className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 outline-none font-bold" 
+                  />
                 </div>
               </div>
+              <div>
+                 <label className="block text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-widest">健身目标</label>
+                 <select value={profile.goal} onChange={e=>setProfile({...profile, goal:e.target.value as any})} className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 outline-none font-bold">
+                   {Object.values(GoalType).map(g => <option key={g} value={g}>{g}</option>)}
+                 </select>
+              </div>
+              
               <button type="submit" className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg shadow-indigo-100">保存设置</button>
               
               <div className="pt-4 border-t border-slate-50">
