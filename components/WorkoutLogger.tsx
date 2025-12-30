@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { WorkoutLog, ExerciseLog, ExerciseSet } from '../types';
 import { PlusIcon, CloseIcon, CalendarIcon } from './Icons';
 import { Spinner } from './Spinner';
@@ -30,6 +30,7 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
   
   const [exercises, setExercises] = useState<ExerciseLog[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isManualCalorieRef = useRef(false); // 记录用户是否手动修改过热量
 
   // 辅助函数：仅允许数字输入
   const handleNumericInput = (value: string, setter: (v: string) => void, allowFloat = false) => {
@@ -39,15 +40,33 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
     }
   };
 
+  // 科学热量计算逻辑 (MET 算法)
   useEffect(() => {
-    if (duration) {
+    if (duration && !isManualCalorieRef.current) {
       const dur = parseInt(duration);
       if (!isNaN(dur) && dur > 0) {
-        const estimatedCalories = Math.round(5.0 * userWeight * (dur / 60));
+        // 根据动作组成动态调整 MET 值
+        // 力量训练平均 MET 约 4.5，有氧运动平均 MET 约 8.0
+        let met = 5.0; // 默认基础值
+        
+        if (exercises.length > 0) {
+          const cardioCount = exercises.filter(e => e.type === 'cardio').length;
+          const strengthCount = exercises.filter(e => e.type === 'strength').length;
+          
+          if (cardioCount > 0 && strengthCount === 0) met = 8.5; // 纯有氧
+          else if (strengthCount > 0 && cardioCount === 0) met = 4.5; // 纯力量
+          else if (cardioCount > 0 && strengthCount > 0) met = 6.5; // 混氧训练
+        } else {
+          // 如果还没加动作，根据当前选择的 Tab 预估
+          met = exerciseType === 'cardio' ? 8.0 : 4.5;
+        }
+
+        // 公式: 消耗 = MET * 体重(kg) * (时长/60)
+        const estimatedCalories = Math.round(met * userWeight * (dur / 60));
         setCalories(estimatedCalories.toString());
       }
     }
-  }, [duration, userWeight]);
+  }, [duration, userWeight, exercises, exerciseType]);
 
   const addExercise = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -72,6 +91,7 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
       }];
       newExercise = { name: exerciseName, type: 'cardio', sets };
       
+      // 智能累加总时长
       if (!duration) {
         setDuration(exDuration);
       } else {
@@ -135,7 +155,6 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">日期</label>
-              {/* 针对移动端优化的日期输入样式 */}
               <div className="relative group">
                 <input 
                   type="date" 
@@ -262,17 +281,28 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
             </div>
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">消耗 (kcal)</label>
-              <input 
-                type="text" 
-                inputMode="numeric"
-                value={calories} 
-                onChange={e => handleNumericInput(e.target.value, setCalories)} 
-                className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500 h-[48px]" 
-              />
+              <div className="relative">
+                <input 
+                  type="text" 
+                  inputMode="numeric"
+                  value={calories} 
+                  onChange={e => {
+                    isManualCalorieRef.current = true;
+                    handleNumericInput(e.target.value, setCalories);
+                  }} 
+                  className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500 h-[48px]" 
+                />
+                {!isManualCalorieRef.current && duration && (
+                   <div className="absolute -bottom-5 left-1 flex items-center gap-1">
+                      <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">AI 智能估算中</span>
+                   </div>
+                )}
+              </div>
             </div>
           </div>
           
-          <div className="pb-10">
+          <div className="pb-10 pt-2">
              <button
               type="submit"
               disabled={isSubmitting}
