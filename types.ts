@@ -1,4 +1,3 @@
-
 export enum GoalType {
   WEIGHT_LOSS = '减脂',
   MUSCLE_GAIN = '增肌',
@@ -10,12 +9,17 @@ export enum GoalType {
 export interface ExerciseSet {
   weight: number;
   reps: number;
-  duration?: number; // 新增：用于记录有氧运动的时长（秒或分钟）
+  duration?: number;   // 持续时间 (min)
+  speed?: number;      // 速度 (km/h)
+  incline?: number;    // 坡度 (%)
+  resistance?: number; // 阻力等级
+  level?: number;      // 机器等级 (如楼梯机)
 }
 
 export interface ExerciseLog {
   name: string;
-  type: 'strength' | 'cardio'; // 新增：标识动作类型
+  type: 'strength' | 'cardio';
+  cardioCategory?: string; // 具体有氧类型
   sets: ExerciseSet[];
 }
 
@@ -23,7 +27,7 @@ export interface WorkoutLog {
   id: string;
   date: string;
   title: string;
-  duration: number; // 训练总时长
+  duration: number;
   calories: number;
   notes: string;
   exercises: ExerciseLog[];

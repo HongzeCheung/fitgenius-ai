@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { WorkoutLog, ExerciseLog, ExerciseSet } from '../types';
-import { PlusIcon, CloseIcon, CalendarIcon } from './Icons';
+import { PlusIcon, CloseIcon, CheckCircleIcon } from './Icons';
 import { Spinner } from './Spinner';
 
 interface WorkoutLoggerProps {
@@ -8,6 +8,15 @@ interface WorkoutLoggerProps {
   onClose?: () => void;
   userWeight?: number;
 }
+
+const CARDIO_CATEGORIES = [
+  { id: 'running', name: '跑步', icon: '🏃‍♂️', baseMET: 8.0 },
+  { id: 'incline', name: '跑步机爬坡', icon: '⛰️', baseMET: 6.0 },
+  { id: 'stairmaster', name: '楼梯机', icon: '🪜', baseMET: 9.0 },
+  { id: 'rowing', name: '划船机', icon: '🚣', baseMET: 7.0 },
+  { id: 'elliptical', name: '椭圆机', icon: '🎡', baseMET: 5.5 },
+  { id: 'other', name: '其他有氧', icon: '⚡', baseMET: 5.0 }
+];
 
 export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose, userWeight = 75 }) => {
   const [dateStr, setDateStr] = useState(() => {
@@ -23,16 +32,25 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
   // 动作录入状态
   const [exerciseType, setExerciseType] = useState<'strength' | 'cardio'>('strength');
   const [exerciseName, setExerciseName] = useState('');
+  
+  // 力量训练状态
   const [weight, setWeight] = useState('');
   const [reps, setReps] = useState('');
   const [setsCount, setSetsCount] = useState('');
+  
+  // 有氧细化状态
+  const [cardioCategory, setCardioCategory] = useState(CARDIO_CATEGORIES[0].id);
+  const [cardioSpeed, setCardioSpeed] = useState('');
+  const [cardioIncline, setCardioIncline] = useState('');
+  const [cardioLevel, setCardioLevel] = useState('');
+  const [cardioResistance, setCardioResistance] = useState('');
   const [exDuration, setExDuration] = useState('');
   
   const [exercises, setExercises] = useState<ExerciseLog[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const isManualCalorieRef = useRef(false); // 记录用户是否手动修改过热量
+  const isManualCalorieRef = useRef(false);
+  const [isCalculating, setIsCalculating] = useState(false);
 
-  // 辅助函数：仅允许数字输入
   const handleNumericInput = (value: string, setter: (v: string) => void, allowFloat = false) => {
     const regex = allowFloat ? /^\d*\.?\d*$/ : /^\d*$/;
     if (regex.test(value)) {
@@ -40,42 +58,58 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
     }
   };
 
-  // 科学热量计算逻辑 (MET 算法)
+  // 增强版热量计算 (MET 动态算法)
   useEffect(() => {
     if (duration && !isManualCalorieRef.current) {
-      const dur = parseInt(duration);
-      if (!isNaN(dur) && dur > 0) {
-        // 根据动作组成动态调整 MET 值
-        // 力量训练平均 MET 约 4.5，有氧运动平均 MET 约 8.0
-        let met = 5.0; // 默认基础值
-        
-        if (exercises.length > 0) {
-          const cardioCount = exercises.filter(e => e.type === 'cardio').length;
-          const strengthCount = exercises.filter(e => e.type === 'strength').length;
-          
-          if (cardioCount > 0 && strengthCount === 0) met = 8.5; // 纯有氧
-          else if (strengthCount > 0 && cardioCount === 0) met = 4.5; // 纯力量
-          else if (cardioCount > 0 && strengthCount > 0) met = 6.5; // 混氧训练
-        } else {
-          // 如果还没加动作，根据当前选择的 Tab 预估
-          met = exerciseType === 'cardio' ? 8.0 : 4.5;
-        }
+      setIsCalculating(true);
+      const timer = setTimeout(() => {
+        const dur = parseInt(duration);
+        if (!isNaN(dur) && dur > 0) {
+          let totalWeightedMET = 0;
+          let totalExDuration = 0;
 
-        // 公式: 消耗 = MET * 体重(kg) * (时长/60)
-        const estimatedCalories = Math.round(met * userWeight * (dur / 60));
-        setCalories(estimatedCalories.toString());
-      }
+          if (exercises.length > 0) {
+            exercises.forEach(ex => {
+              if (ex.type === 'cardio') {
+                const cat = CARDIO_CATEGORIES.find(c => c.id === ex.cardioCategory) || CARDIO_CATEGORIES[5];
+                let met = cat.baseMET;
+                const s = ex.sets[0];
+                
+                // 根据强度参数微调 MET
+                if (ex.cardioCategory === 'running' && s.speed) met += (s.speed - 8) * 0.5;
+                if (ex.cardioCategory === 'incline' && s.incline) met += s.incline * 0.4;
+                if (ex.cardioCategory === 'stairmaster' && s.level) met += s.level * 0.3;
+                
+                const d = s.duration || 0;
+                totalWeightedMET += met * d;
+                totalExDuration += d;
+              } else {
+                totalWeightedMET += 4.5 * 10;
+                totalExDuration += 10;
+              }
+            });
+          }
+
+          let finalMET = exercises.length > 0 ? (totalWeightedMET / Math.max(1, totalExDuration)) : (exerciseType === 'cardio' ? 7.0 : 4.5);
+          finalMET = Math.max(3, Math.min(15, finalMET));
+
+          const estimatedCalories = Math.round(finalMET * userWeight * (dur / 60));
+          setCalories(estimatedCalories.toString());
+        }
+        setIsCalculating(false); // 计算结束，切换标识
+      }, 500); // 增加少量体感延迟，让用户感知到计算过程
+      
+      return () => clearTimeout(timer);
     }
   }, [duration, userWeight, exercises, exerciseType]);
 
   const addExercise = (e: React.MouseEvent) => {
     e.preventDefault();
-    if (!exerciseName) return;
-
+    
     let newExercise: ExerciseLog;
 
     if (exerciseType === 'strength') {
-      if (!reps || !setsCount) return;
+      if (!exerciseName || !reps || !setsCount) return;
       const numericWeight = weight === '' ? 0 : parseFloat(weight);
       const sets: ExerciseSet[] = Array(parseInt(setsCount)).fill(null).map(() => ({
         weight: numericWeight,
@@ -84,27 +118,31 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
       newExercise = { name: exerciseName, type: 'strength', sets };
     } else {
       if (!exDuration) return;
+      const cat = CARDIO_CATEGORIES.find(c => c.id === cardioCategory)!;
       const sets: ExerciseSet[] = [{
         weight: 0,
         reps: 0,
-        duration: parseInt(exDuration)
+        duration: parseInt(exDuration),
+        speed: cardioSpeed ? parseFloat(cardioSpeed) : undefined,
+        incline: cardioIncline ? parseFloat(cardioIncline) : undefined,
+        level: cardioLevel ? parseInt(cardioLevel) : undefined,
+        resistance: cardioResistance ? parseInt(cardioResistance) : undefined,
       }];
-      newExercise = { name: exerciseName, type: 'cardio', sets };
+      newExercise = { 
+        name: exerciseName || cat.name, 
+        type: 'cardio', 
+        cardioCategory,
+        sets 
+      };
       
-      // 智能累加总时长
-      if (!duration) {
-        setDuration(exDuration);
-      } else {
-        setDuration((parseInt(duration) + parseInt(exDuration)).toString());
-      }
+      const newTotalDur = (parseInt(duration) || 0) + parseInt(exDuration);
+      setDuration(newTotalDur.toString());
     }
 
     setExercises([...exercises, newExercise]);
     setExerciseName('');
-    setWeight('');
-    setReps('');
-    setSetsCount('');
-    setExDuration('');
+    setWeight(''); setReps(''); setSetsCount('');
+    setExDuration(''); setCardioSpeed(''); setCardioIncline(''); setCardioLevel(''); setCardioResistance('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -155,14 +193,12 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">日期</label>
-              <div className="relative group">
-                <input 
-                  type="date" 
-                  value={dateStr} 
-                  onChange={e => setDateStr(e.target.value)} 
-                  className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500 appearance-none h-[48px]"
-                />
-              </div>
+              <input 
+                type="date" 
+                value={dateStr} 
+                onChange={e => setDateStr(e.target.value)} 
+                className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500 h-[48px]"
+              />
             </div>
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">训练标题</label>
@@ -186,61 +222,75 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
                 </button>
              </div>
 
-             <input 
-               placeholder={exerciseType === 'strength' ? "动作名称 (如: 杠铃卧推)" : "项目名称 (如: 跑步 / 椭圆机)"}
-               value={exerciseName}
-               onChange={e => setExerciseName(e.target.value)}
-               className="w-full bg-white border border-slate-200 rounded-2xl p-4 text-sm font-bold outline-none focus:border-indigo-500"
-             />
+             {exerciseType === 'cardio' ? (
+               <div className="space-y-4">
+                  <div className="grid grid-cols-3 gap-2">
+                    {CARDIO_CATEGORIES.map(cat => (
+                      <button
+                        key={cat.id}
+                        onClick={(e) => { e.preventDefault(); setCardioCategory(cat.id); }}
+                        className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all ${cardioCategory === cat.id ? 'bg-white border-emerald-500 shadow-sm scale-105' : 'bg-slate-50 border-transparent text-slate-400 opacity-70'}`}
+                      >
+                        <span className="text-xl mb-1">{cat.icon}</span>
+                        <span className="text-[9px] font-black">{cat.name}</span>
+                      </button>
+                    ))}
+                  </div>
 
-             {exerciseType === 'strength' ? (
-               <div className="grid grid-cols-3 gap-3">
-                 <div>
-                   <label className="block text-[9px] font-bold text-slate-400 mb-1 ml-1 uppercase">重量(kg)</label>
-                   <input 
-                     placeholder="0=自重" 
-                     type="text" 
-                     inputMode="decimal"
-                     value={weight} 
-                     onChange={e=>handleNumericInput(e.target.value, setWeight, true)} 
-                     className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none"
-                   />
-                 </div>
-                 <div>
-                   <label className="block text-[9px] font-bold text-slate-400 mb-1 ml-1 uppercase">次数</label>
-                   <input 
-                     placeholder="次" 
-                     type="text" 
-                     inputMode="numeric"
-                     value={reps} 
-                     onChange={e=>handleNumericInput(e.target.value, setReps)} 
-                     className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none"
-                   />
-                 </div>
-                 <div>
-                   <label className="block text-[9px] font-bold text-slate-400 mb-1 ml-1 uppercase">组数</label>
-                   <input 
-                     placeholder="组" 
-                     type="text" 
-                     inputMode="numeric"
-                     value={setsCount} 
-                     onChange={e=>handleNumericInput(e.target.value, setSetsCount)} 
-                     className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none"
-                   />
-                 </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {(cardioCategory === 'running' || cardioCategory === 'incline') && (
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-400 mb-1 ml-1 uppercase">速度 (km/h)</label>
+                        <input value={cardioSpeed} onChange={e=>handleNumericInput(e.target.value, setCardioSpeed, true)} placeholder="8.5" className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none" />
+                      </div>
+                    )}
+                    {cardioCategory === 'incline' && (
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-400 mb-1 ml-1 uppercase">坡度 (%)</label>
+                        <input value={cardioIncline} onChange={e=>handleNumericInput(e.target.value, setCardioIncline, true)} placeholder="3.0" className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none" />
+                      </div>
+                    )}
+                    {cardioCategory === 'stairmaster' && (
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-400 mb-1 ml-1 uppercase">等级 (Level)</label>
+                        <input value={cardioLevel} onChange={e=>handleNumericInput(e.target.value, setCardioLevel)} placeholder="8" className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none" />
+                      </div>
+                    )}
+                    {(cardioCategory === 'rowing' || cardioCategory === 'elliptical') && (
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-400 mb-1 ml-1 uppercase">阻力 (Resistance)</label>
+                        <input value={cardioResistance} onChange={e=>handleNumericInput(e.target.value, setCardioResistance)} placeholder="5" className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none" />
+                      </div>
+                    )}
+                    <div className={cardioCategory === 'incline' ? 'col-span-2' : ''}>
+                      <label className="block text-[9px] font-bold text-slate-400 mb-1 ml-1 uppercase">持续时长 (min)</label>
+                      <input value={exDuration} onChange={e=>handleNumericInput(e.target.value, setExDuration)} placeholder="分钟" className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none" />
+                    </div>
+                  </div>
                </div>
              ) : (
-               <div>
-                 <label className="block text-[9px] font-bold text-slate-400 mb-1 ml-1 uppercase">持续时长 (分钟)</label>
+               <>
                  <input 
-                    placeholder="请输入运动时长" 
-                    type="text" 
-                    inputMode="numeric"
-                    value={exDuration} 
-                    onChange={e=>handleNumericInput(e.target.value, setExDuration)} 
-                    className="w-full bg-white border border-slate-200 rounded-2xl p-4 text-sm font-bold outline-none"
+                   placeholder="动作名称 (如: 杠铃卧推)"
+                   value={exerciseName}
+                   onChange={e => setExerciseName(e.target.value)}
+                   className="w-full bg-white border border-slate-200 rounded-2xl p-4 text-sm font-bold outline-none focus:border-indigo-500"
                  />
-               </div>
+                 <div className="grid grid-cols-3 gap-3">
+                   <div>
+                     <label className="block text-[9px] font-bold text-slate-400 mb-1 ml-1 uppercase">重量(kg)</label>
+                     <input placeholder="0=自重" type="text" inputMode="decimal" value={weight} onChange={e=>handleNumericInput(e.target.value, setWeight, true)} className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none" />
+                   </div>
+                   <div>
+                     <label className="block text-[9px] font-bold text-slate-400 mb-1 ml-1 uppercase">次数</label>
+                     <input placeholder="次" type="text" inputMode="numeric" value={reps} onChange={e=>handleNumericInput(e.target.value, setReps)} className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none" />
+                   </div>
+                   <div>
+                     <label className="block text-[9px] font-bold text-slate-400 mb-1 ml-1 uppercase">组数</label>
+                     <input placeholder="组" type="text" inputMode="numeric" value={setsCount} onChange={e=>handleNumericInput(e.target.value, setSetsCount)} className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none" />
+                   </div>
+                 </div>
+               </>
              )}
 
              <button onClick={addExercise} className={`w-full py-4 rounded-2xl text-white font-black text-xs transition-all shadow-lg flex items-center justify-center gap-2 active:scale-95 ${exerciseType === 'strength' ? 'bg-slate-800 shadow-slate-200' : 'bg-emerald-600 shadow-emerald-100'}`}>
@@ -258,7 +308,7 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
                      <span className="text-slate-500 font-bold bg-slate-50 px-2 py-1 rounded-lg text-[10px]">
                         {ex.type === 'strength' 
                           ? `${ex.sets.length}组 × ${ex.sets[0].reps}次 ${ex.sets[0].weight > 0 ? `@${ex.sets[0].weight}kg` : '(自重)'}`
-                          : `${ex.sets[0].duration} 分钟`
+                          : `${ex.sets[0].duration} min ${ex.sets[0].speed ? `| ${ex.sets[0].speed}km/h` : ''}${ex.sets[0].incline ? ` | 坡度${ex.sets[0].incline}%` : ''}`
                         }
                      </span>
                    </div>
@@ -270,14 +320,7 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">总时长 (min)</label>
-              <input 
-                type="text" 
-                inputMode="numeric"
-                value={duration} 
-                onChange={e => handleNumericInput(e.target.value, setDuration)} 
-                className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500 h-[48px]" 
-                required 
-              />
+              <input type="text" inputMode="numeric" value={duration} onChange={e => handleNumericInput(e.target.value, setDuration)} className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500 h-[48px]" required />
             </div>
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">消耗 (kcal)</label>
@@ -293,9 +336,18 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
                   className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500 h-[48px]" 
                 />
                 {!isManualCalorieRef.current && duration && (
-                   <div className="absolute -bottom-5 left-1 flex items-center gap-1">
-                      <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">AI 智能估算中</span>
+                   <div className="absolute -bottom-5 left-1 flex items-center gap-1.5 transition-all duration-300">
+                      {isCalculating ? (
+                        <>
+                          <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">AI 智能估算中...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircleIcon className="w-2.5 h-2.5 text-emerald-500" />
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">AI 已自动预估</span>
+                        </>
+                      )}
                    </div>
                 )}
               </div>
