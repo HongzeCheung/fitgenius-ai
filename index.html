@@ -30,6 +30,17 @@
       .recharts-cartesian-grid-horizontal line, .recharts-cartesian-grid-vertical line {
         stroke: #e2e8f0;
       }
+      /* 核心修改：隐藏数字输入框的箭头样式 */
+      /* Chrome, Safari, Edge, Opera */
+      input::-webkit-outer-spin-button,
+      input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      /* Firefox */
+      input[type=number] {
+        -moz-appearance: textfield;
+      }
     </style>
   <script type="importmap">
 {

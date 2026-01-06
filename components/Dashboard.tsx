@@ -1,38 +1,34 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, RadialBarChart, RadialBar } from 'recharts';
-import { WorkoutLog } from '../types';
-import { ActivityIcon } from './Icons';
+import { WorkoutLog, UserProfile, WeightEntry } from '../types';
+import { ActivityIcon, PlusIcon, CheckCircleIcon } from './Icons';
+import { Spinner } from './Spinner';
 
 interface DashboardProps {
   logs: WorkoutLog[];
+  profile: UserProfile;
+  onWeightUpdate: (weight: number) => Promise<void>;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ logs }) => {
-  // Ensure logs is an array
+export const Dashboard: React.FC<DashboardProps> = ({ logs, profile, onWeightUpdate }) => {
+  const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
+  const [newWeight, setNewWeight] = useState(profile.weight.toString());
+  const [isSavingWeight, setIsSavingWeight] = useState(false);
+
   const safeLogs = Array.isArray(logs) ? logs : [];
-  
   const totalWorkouts = safeLogs.length;
   const totalMinutes = safeLogs.reduce((acc, log) => acc + (Number(log.duration) || 0), 0);
 
-  /**
-   * 核心逻辑：生成最近 7 天的连续数据
-   * 即使某天没有训练，也应该显示 0，而不是用更早的历史记录填充
-   */
   const generateLast7DaysData = () => {
     const data = [];
     const now = new Date();
-    
-    // 创建一个从 6 天前到今天的日期数组
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
       const dateStr = d.toDateString();
       const dayLabel = d.toLocaleDateString('zh-CN', { weekday: 'short' });
-      
-      // 查找当天的所有日志并加总（支持一天多次训练合并显示）
       const dayLogs = safeLogs.filter(log => new Date(log.date).toDateString() === dateStr);
-      
       const dayCalories = dayLogs.reduce((acc, log) => acc + (Number(log.calories) || 0), 0);
       const dayMinutes = dayLogs.reduce((acc, log) => acc + (Number(log.duration) || 0), 0);
       
@@ -46,28 +42,115 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs }) => {
     return data;
   };
 
-  const chartData = generateLast7DaysData();
+  // 1. 先对历史数据进行严格排序
+  const sortedWeightHistory = [...(profile.weightHistory || [])].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
 
-  // Activity Rings Data (Simulated Goals)
+  // 2. 准备图表数据（最近10次）
+  const weightHistoryData = sortedWeightHistory
+    .map(h => ({
+      date: new Date(h.date).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }),
+      weight: h.weight,
+      fullDate: new Date(h.date).toLocaleDateString('zh-CN')
+    }))
+    .slice(-10);
+
   const calorieGoal = 500;
   const durationGoal = 60;
-  
-  // 今日数据（图表数组的最后一项就是今天）
+  const chartData = generateLast7DaysData();
   const todayStats = chartData[chartData.length - 1];
-  const todayCalories = todayStats.calories;
-  const todayDuration = todayStats.minutes;
-
+  
   const ringsData = [
-    { name: '卡路里', value: Math.min((todayCalories / calorieGoal) * 100, 100), fill: '#f97316' },
-    { name: '时长', value: Math.min((todayDuration / durationGoal) * 100, 100), fill: '#10b981' }
+    { name: '卡路里', value: Math.min((todayStats.calories / calorieGoal) * 100, 100), fill: '#f97316' },
+    { name: '时长', value: Math.min((todayStats.minutes / durationGoal) * 100, 100), fill: '#10b981' }
   ];
+
+  // 3. 核心修复：计算总计变化
+  // 基准体重应该是“排序后”的第一条记录。如果没有记录，则用当前体重。
+  const baselineWeight = sortedWeightHistory.length > 0 ? sortedWeightHistory[0].weight : profile.weight;
+  const currentWeight = profile.weight;
+  const rawChange = currentWeight - baselineWeight;
+  const weightChange = rawChange.toFixed(1);
+  
+  // 颜色逻辑：减脂目标通常希望负数显示为绿色（成功），增肌目标相反。这里默认减重为绿色。
+  const changeColor = rawChange <= 0 ? 'text-emerald-500' : 'text-rose-500';
+
+  const handleWeightInputChange = (val: string) => {
+    const filtered = val.replace(/[^\d.]/g, '');
+    const parts = filtered.split('.');
+    const finalVal = parts.length > 2 ? `${parts[0]}.${parts[1]}` : filtered;
+    setNewWeight(finalVal);
+  };
+
+  const handleSaveWeight = async () => {
+    const w = parseFloat(newWeight);
+    if (isNaN(w) || w <= 0) return;
+    setIsSavingWeight(true);
+    try {
+      await onWeightUpdate(w);
+      setIsWeightModalOpen(false);
+    } catch (e) {
+      console.error("Update weight failed", e);
+    } finally {
+      setIsSavingWeight(false);
+    }
+  };
 
   return (
     <div className="space-y-4 sm:space-y-8">
-      {/* Widgets Grid - Forced Single Column */}
+      {/* Weight Summary Widget */}
+      <div className="bg-white p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col gap-4 relative overflow-hidden group">
+         <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+                <div className="p-2 bg-indigo-50 rounded-full text-indigo-500">
+                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" /></svg>
+                </div>
+                <span className="font-bold text-slate-700">体重追踪</span>
+            </div>
+            <button 
+              onClick={() => {
+                setNewWeight(profile.weight.toString());
+                setIsWeightModalOpen(true);
+              }}
+              className="bg-indigo-600 text-white text-[10px] font-black px-3 py-1.5 rounded-full shadow-lg shadow-indigo-100 active:scale-95 transition-all"
+            >
+               记录体重
+            </button>
+         </div>
+         
+         <div className="flex items-end gap-4">
+            <div>
+               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">当前体重</p>
+               <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-black text-slate-800">{currentWeight}</span>
+                  <span className="text-sm font-bold text-slate-400">kg</span>
+               </div>
+            </div>
+            <div className="pb-1">
+               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">总计变化</p>
+               <div className={`text-sm font-black ${changeColor}`}>
+                  {rawChange > 0 ? '+' : ''}{weightChange} kg
+               </div>
+            </div>
+         </div>
+
+         {weightHistoryData.length > 1 && (
+           <div className="h-24 w-full mt-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={weightHistoryData}>
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                    formatter={(value: number) => [`${value}kg`, '体重']}
+                  />
+                  <Line type="monotone" dataKey="weight" stroke="#6366f1" strokeWidth={3} dot={false} activeDot={{ r: 4 }} />
+                </LineChart>
+              </ResponsiveContainer>
+           </div>
+         )}
+      </div>
+
       <div className="grid grid-cols-1 gap-4 sm:gap-6">
-        
-        {/* Main Activity Widget (Rings) */}
         <div className="bg-white p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between relative overflow-hidden">
            <div className="flex items-center justify-between z-10">
              <div className="flex items-center gap-2">
@@ -92,7 +175,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs }) => {
                     />
                   </RadialBarChart>
                 </ResponsiveContainer>
-                {/* Center Icon/Text */}
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                    <ActivityIcon className="w-6 h-6 text-slate-300" />
                 </div>
@@ -101,30 +183,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs }) => {
                  <div>
                     <p className="text-xs text-slate-400 mb-0.5">活动消耗</p>
                     <div className="flex items-baseline gap-1">
-                       <span className="text-lg sm:text-xl font-bold text-orange-500">{todayCalories}</span>
+                       <span className="text-lg sm:text-xl font-bold text-orange-500">{todayStats.calories}</span>
                        <span className="text-[10px] sm:text-xs text-slate-400">/ {calorieGoal}</span>
                     </div>
                     <div className="w-full bg-slate-100 h-1.5 rounded-full mt-1">
-                       <div className="h-1.5 rounded-full bg-orange-500" style={{width: `${Math.min((todayCalories/calorieGoal)*100, 100)}%`}}></div>
+                       <div className="h-1.5 rounded-full bg-orange-500" style={{width: `${Math.min((todayStats.calories/calorieGoal)*100, 100)}%`}}></div>
                     </div>
                  </div>
                  <div>
                     <p className="text-xs text-slate-400 mb-0.5">锻炼时长</p>
                     <div className="flex items-baseline gap-1">
-                       <span className="text-lg sm:text-xl font-bold text-emerald-500">{todayDuration}</span>
+                       <span className="text-lg sm:text-xl font-bold text-emerald-500">{todayStats.minutes}</span>
                        <span className="text-[10px] sm:text-xs text-slate-400">/ {durationGoal} min</span>
                     </div>
                     <div className="w-full bg-slate-100 h-1.5 rounded-full mt-1">
-                       <div className="h-1.5 rounded-full bg-emerald-500" style={{width: `${Math.min((todayDuration/durationGoal)*100, 100)}%`}}></div>
+                       <div className="h-1.5 rounded-full bg-emerald-500" style={{width: `${Math.min((todayStats.minutes/durationGoal)*100, 100)}%`}}></div>
                     </div>
                  </div>
               </div>
            </div>
         </div>
 
-        {/* Stats Widgets */}
         <div className="grid grid-cols-2 gap-3 sm:gap-6">
-           {/* Total Workouts */}
            <div className="bg-white p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-center items-start group hover:shadow-md transition-all">
               <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-500 mb-4 group-hover:scale-110 transition-transform">
                  <ActivityIcon className="w-6 h-6" />
@@ -132,8 +212,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs }) => {
               <p className="text-slate-400 text-sm font-medium mb-1">累计训练</p>
               <p className="text-2xl sm:text-3xl font-bold text-slate-800">{totalWorkouts} <span className="text-xs sm:text-base font-normal text-slate-400">次</span></p>
            </div>
-
-           {/* Total Time */}
            <div className="bg-white p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-center items-start group hover:shadow-md transition-all">
               <div className="p-3 bg-blue-50 rounded-2xl text-blue-500 mb-4 group-hover:scale-110 transition-transform">
                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-6 h-6">
@@ -146,61 +224,35 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs }) => {
         </div>
       </div>
 
-      {/* Charts Section - Forced Single Column */}
-      <div className="grid grid-cols-1 gap-4 sm:gap-6">
-        <div className="bg-white p-5 sm:p-8 rounded-3xl shadow-sm border border-slate-100">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-bold text-slate-800">热量趋势</h3>
-            <span className="text-xs font-medium text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full">近7天</span>
-          </div>
-          <div className="h-56 sm:h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ left: 0, right: 10, top: 10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" stroke="#94a3b8" tick={{fontSize: 11}} axisLine={false} tickLine={false} dy={10} />
-                <YAxis stroke="#94a3b8" tick={{fontSize: 11}} axisLine={false} tickLine={false} width={40} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#fff', border: 'none', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', color: '#1e293b' }}
-                  itemStyle={{ color: '#f97316', fontWeight: 600 }}
-                  labelFormatter={(name, payload) => payload[0]?.payload?.fullDate || name}
-                />
-                <Line type="monotone" dataKey="calories" stroke="#f97316" strokeWidth={3} dot={{ r: 4, fill: '#fff', stroke: '#f97316', strokeWidth: 2 }} activeDot={{ r: 6 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+      {/* Weight Input Modal */}
+      {isWeightModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] flex items-center justify-center p-6 animate-fade-in">
+           <div className="bg-white rounded-3xl p-8 w-full max-w-xs shadow-2xl animate-scale-in">
+              <h3 className="text-lg font-bold text-slate-800 mb-4">记录当前体重</h3>
+              <div className="relative mb-6">
+                 <input 
+                   type="text" 
+                   inputMode="decimal"
+                   value={newWeight}
+                   onChange={e => handleWeightInputChange(e.target.value)}
+                   className="w-full bg-slate-50 border-2 border-indigo-100 rounded-2xl p-4 text-2xl font-black text-center text-indigo-600 outline-none focus:border-indigo-500 transition-all"
+                   autoFocus
+                 />
+                 <span className="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-slate-400 pointer-events-none">kg</span>
+              </div>
+              <div className="flex gap-3">
+                 <button onClick={() => setIsWeightModalOpen(false)} className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold rounded-xl active:scale-95 transition-all">取消</button>
+                 <button 
+                  onClick={handleSaveWeight} 
+                  disabled={isSavingWeight}
+                  className="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-indigo-100 active:scale-95 transition-all flex items-center justify-center"
+                 >
+                    {isSavingWeight ? <Spinner /> : '保存'}
+                 </button>
+              </div>
+           </div>
         </div>
-
-        <div className="bg-white p-5 sm:p-8 rounded-3xl shadow-sm border border-slate-100">
-           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-bold text-slate-800">时长统计</h3>
-            <span className="text-xs font-medium text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full">近7天</span>
-          </div>
-          <div className="h-56 sm:h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} barSize={16} margin={{ left: 0, right: 10, top: 10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" stroke="#94a3b8" tick={{fontSize: 11}} axisLine={false} tickLine={false} dy={10} />
-                <YAxis 
-                  stroke="#94a3b8" 
-                  tick={{fontSize: 11}} 
-                  axisLine={false} 
-                  tickLine={false} 
-                  width={40} 
-                  tickFormatter={(value) => `${value}m`}
-                />
-                <Tooltip 
-                   cursor={{fill: 'rgba(0,0,0,0.02)'}}
-                   contentStyle={{ backgroundColor: '#fff', border: 'none', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', color: '#1e293b' }}
-                   itemStyle={{ color: '#6366f1', fontWeight: 600 }}
-                   formatter={(value: number) => [`${value} min`, '时长']}
-                   labelFormatter={(name, payload) => payload[0]?.payload?.fullDate || name}
-                />
-                <Bar dataKey="minutes" fill="#6366f1" radius={[10, 10, 10, 10]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

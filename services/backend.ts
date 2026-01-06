@@ -82,6 +82,16 @@ export const backend = {
     await handleResponse(response);
   },
 
+  // 新增：体重记录
+  async addWeightLog(weight: number): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/weight`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ weight }),
+    });
+    return await handleResponse(response);
+  },
+
   async getWorkoutLogs(): Promise<WorkoutLog[]> {
     const response = await fetch(`${API_BASE_URL}/logs`, { headers: getHeaders() });
     return handleResponse(response).catch(() => []);

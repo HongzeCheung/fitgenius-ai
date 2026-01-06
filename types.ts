@@ -6,6 +6,11 @@ export enum GoalType {
   GENERAL_HEALTH = '健康维持'
 }
 
+export interface WeightEntry {
+  date: string;
+  weight: number;
+}
+
 export interface ExerciseSet {
   weight: number;
   reps: number;
