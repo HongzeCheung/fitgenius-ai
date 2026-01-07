@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, RadialBarChart, RadialBar } from 'recharts';
-import { WorkoutLog, UserProfile, WeightEntry } from '../types';
-import { ActivityIcon, PlusIcon, CheckCircleIcon } from './Icons';
+import { XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, RadialBarChart, RadialBar } from 'recharts';
+import { WorkoutLog, UserProfile } from '../types';
+import { ActivityIcon } from './Icons';
 import { Spinner } from './Spinner';
 
 interface DashboardProps {
@@ -67,13 +67,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs, profile, onWeightUpd
   ];
 
   // 3. 核心修复：计算总计变化
-  // 基准体重应该是“排序后”的第一条记录。如果没有记录，则用当前体重。
   const baselineWeight = sortedWeightHistory.length > 0 ? sortedWeightHistory[0].weight : profile.weight;
   const currentWeight = profile.weight;
   const rawChange = currentWeight - baselineWeight;
   const weightChange = rawChange.toFixed(1);
   
-  // 颜色逻辑：减脂目标通常希望负数显示为绿色（成功），增肌目标相反。这里默认减重为绿色。
   const changeColor = rawChange <= 0 ? 'text-emerald-500' : 'text-rose-500';
 
   const handleWeightInputChange = (val: string) => {
@@ -139,11 +137,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs, profile, onWeightUpd
            <div className="h-24 w-full mt-2">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={weightHistoryData}>
+                  {/* 隐藏 X 轴和 Y 轴，但通过 domain 锁定数据区间 */}
+                  <XAxis dataKey="date" hide />
+                  <YAxis hide domain={['dataMin - 1', 'dataMax + 1']} />
                   <Tooltip 
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                    labelStyle={{ fontWeight: 'bold', color: '#6366f1' }}
                     formatter={(value: number) => [`${value}kg`, '体重']}
                   />
-                  <Line type="monotone" dataKey="weight" stroke="#6366f1" strokeWidth={3} dot={false} activeDot={{ r: 4 }} />
+                  <Line 
+                    type="monotone" 
+                    dataKey="weight" 
+                    stroke="#6366f1" 
+                    strokeWidth={3} 
+                    dot={{ r: 3, fill: '#6366f1', strokeWidth: 0 }} 
+                    activeDot={{ r: 5, strokeWidth: 0 }} 
+                    animationDuration={1000}
+                  />
                 </LineChart>
               </ResponsiveContainer>
            </div>
