@@ -18,6 +18,11 @@ const CARDIO_CATEGORIES = [
   { id: 'other', name: '其他有氧', icon: '⚡', baseMET: 5.0 }
 ];
 
+// 基础生理常数
+const REST_MET = 2.5; // 在健身房休息、准备、走动时的平均 MET
+const STRENGTH_MET = 4.5; // 普通力量训练活跃时的平均 MET
+const STRENGTH_SET_DURATION = 1.5; // 每组力量训练预估占用的活跃时间（分钟）
+
 export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose, userWeight = 75 }) => {
   const [dateStr, setDateStr] = useState(() => {
     const d = new Date();
@@ -29,16 +34,13 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
   const [calories, setCalories] = useState('');
   const [notes, setNotes] = useState('');
   
-  // 动作录入状态
   const [exerciseType, setExerciseType] = useState<'strength' | 'cardio'>('strength');
   const [exerciseName, setExerciseName] = useState('');
   
-  // 力量训练状态
   const [weight, setWeight] = useState('');
   const [reps, setReps] = useState('');
   const [setsCount, setSetsCount] = useState('');
   
-  // 有氧细化状态
   const [cardioCategory, setCardioCategory] = useState(CARDIO_CATEGORIES[0].id);
   const [cardioSpeed, setCardioSpeed] = useState('');
   const [cardioIncline, setCardioIncline] = useState('');
@@ -58,50 +60,60 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
     }
   };
 
-  // 增强版热量计算 (MET 动态算法)
+  // 修复后的分段热量计算逻辑
   useEffect(() => {
-    if (duration && !isManualCalorieRef.current) {
+    const totalDurationMin = parseInt(duration);
+    if (!isNaN(totalDurationMin) && totalDurationMin > 0 && !isManualCalorieRef.current) {
       setIsCalculating(true);
       const timer = setTimeout(() => {
-        const dur = parseInt(duration);
-        if (!isNaN(dur) && dur > 0) {
-          let totalWeightedMET = 0;
-          let totalExDuration = 0;
+        let totalActiveCalories = 0;
+        let totalActiveTime = 0;
 
-          if (exercises.length > 0) {
-            exercises.forEach(ex => {
-              if (ex.type === 'cardio') {
-                const cat = CARDIO_CATEGORIES.find(c => c.id === ex.cardioCategory) || CARDIO_CATEGORIES[5];
-                let met = cat.baseMET;
-                const s = ex.sets[0];
-                
-                // 根据强度参数微调 MET
-                if (ex.cardioCategory === 'running' && s.speed) met += (s.speed - 8) * 0.5;
-                if (ex.cardioCategory === 'incline' && s.incline) met += s.incline * 0.4;
-                if (ex.cardioCategory === 'stairmaster' && s.level) met += s.level * 0.3;
-                
-                const d = s.duration || 0;
-                totalWeightedMET += met * d;
-                totalExDuration += d;
-              } else {
-                totalWeightedMET += 4.5 * 10;
-                totalExDuration += 10;
-              }
-            });
+        // 1. 计算所有已录入动作的活跃消耗
+        exercises.forEach(ex => {
+          if (ex.type === 'cardio') {
+            const cat = CARDIO_CATEGORIES.find(c => c.id === ex.cardioCategory) || CARDIO_CATEGORIES[5];
+            let met = cat.baseMET;
+            const s = ex.sets[0];
+            
+            // 根据强度参数微调 MET
+            if (ex.cardioCategory === 'running' && s.speed) met += (s.speed - 8) * 0.5;
+            if (ex.cardioCategory === 'incline' && s.incline) met += s.incline * 0.4;
+            if (ex.cardioCategory === 'stairmaster' && s.level) met += s.level * 0.3;
+            
+            const d = s.duration || 0;
+            totalActiveCalories += met * userWeight * (d / 60);
+            totalActiveTime += d;
+          } else {
+            // 力量训练：按组数估算活跃时间
+            const setsCount = ex.sets.length;
+            const activeTime = setsCount * STRENGTH_SET_DURATION;
+            totalActiveCalories += STRENGTH_MET * userWeight * (activeTime / 60);
+            totalActiveTime += activeTime;
           }
+        });
 
-          let finalMET = exercises.length > 0 ? (totalWeightedMET / Math.max(1, totalExDuration)) : (exerciseType === 'cardio' ? 7.0 : 4.5);
-          finalMET = Math.max(3, Math.min(15, finalMET));
+        // 2. 计算剩余（休息/间歇）时间的消耗
+        // 如果总时长大于已记录的动作时长，剩下的按 REST_MET 计算
+        const restTime = Math.max(0, totalDurationMin - totalActiveTime);
+        const restCalories = REST_MET * userWeight * (restTime / 60);
 
-          const estimatedCalories = Math.round(finalMET * userWeight * (dur / 60));
-          setCalories(estimatedCalories.toString());
+        const finalTotalCalories = Math.round(totalActiveCalories + restCalories);
+        
+        // 兜底逻辑：如果没有录入任何动作，整个时间段按基础训练强度 4.0 计算
+        if (exercises.length === 0) {
+            const defaultCalories = Math.round(4.0 * userWeight * (totalDurationMin / 60));
+            setCalories(defaultCalories.toString());
+        } else {
+            setCalories(finalTotalCalories.toString());
         }
-        setIsCalculating(false); // 计算结束，切换标识
-      }, 500); // 增加少量体感延迟，让用户感知到计算过程
+        
+        setIsCalculating(false);
+      }, 400);
       
       return () => clearTimeout(timer);
     }
-  }, [duration, userWeight, exercises, exerciseType]);
+  }, [duration, userWeight, exercises]);
 
   const addExercise = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -116,6 +128,10 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
         reps: parseInt(reps)
       }));
       newExercise = { name: exerciseName, type: 'strength', sets };
+      
+      // 力量训练自动增加预估总时长 (1.5min / 组)
+      const currentDur = parseInt(duration) || 0;
+      setDuration((currentDur + (parseInt(setsCount) * STRENGTH_SET_DURATION)).toString());
     } else {
       if (!exDuration) return;
       const cat = CARDIO_CATEGORIES.find(c => c.id === cardioCategory)!;
