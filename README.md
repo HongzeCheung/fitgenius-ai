@@ -66,7 +66,6 @@
 ## ⚠️ 开发与部署说明
 
 1.  **模式切换**：
-    *   本地测试：修改 `services/backend.ts` 中的 `USE_MOCK_BACKEND = true` 即可快速预览。
     *   全栈上线：将 `USE_MOCK_BACKEND = false` 并配置 `PRODUCTION_API_URL` 为您的后端 Render 地址。
 2.  **API Key**：
     *   请确保环境中有有效的 `process.env.API_KEY` 以驱动 Gemini AI 功能。
