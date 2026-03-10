@@ -1,6 +1,15 @@
 
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { UserProfile, WorkoutPlan, WorkoutLog, AIAdvice, TrainingReport, ExerciseInsight } from "../types";
+import {
+  UserProfile,
+  WorkoutPlan,
+  WorkoutLog,
+  AIAdvice,
+  TrainingReport,
+  ExerciseInsight,
+  CoachConversationMessage,
+  CoachChatResponse
+} from "../types";
 
 // Helper to get a fresh instance with the current key
 const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -146,6 +155,50 @@ const insightSchema: Schema = {
   required: ["exerciseName", "targetMuscles", "technicalPoints", "physiologicalPrinciple"]
 };
 
+const coachChatSchema: Schema = {
+  type: Type.OBJECT,
+  properties: {
+    answer: { type: Type.STRING, description: "对用户问题的核心回答，使用中文，尽量具体并包含数字建议" },
+    actions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "接下来24-72小时可执行的步骤，使用中文" },
+    cautions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "风险提醒或注意事项，使用中文" }
+  },
+  required: ["answer", "actions", "cautions"]
+};
+
+interface AskCoachInput {
+  question: string;
+  profile: UserProfile;
+  logs: WorkoutLog[];
+  plan?: WorkoutPlan | null;
+  history?: CoachConversationMessage[];
+}
+
+const summarizeLogsForCoach = (logs: WorkoutLog[]) => {
+  return logs
+    .slice(0, 8)
+    .map((log) => ({
+      date: log.date,
+      title: log.title,
+      duration: log.duration,
+      calories: log.calories,
+      exerciseCount: log.exercises?.length || 0,
+      note: log.notes || ""
+    }));
+};
+
+const summarizePlanForCoach = (plan?: WorkoutPlan | null) => {
+  if (!plan) return null;
+  return {
+    title: plan.title,
+    goal: plan.goal,
+    schedule: plan.schedule.map((day) => ({
+      day: day.day,
+      focus: day.focus,
+      duration: day.duration
+    }))
+  };
+};
+
 export const generateFitnessPlan = async (profile: UserProfile): Promise<WorkoutPlan | null> => {
   const cacheKey = Cache.stableKey('plan', { goal: profile.goal, level: profile.fitnessLevel, weight: profile.weight });
   const cached = Cache.get(cacheKey);
@@ -238,6 +291,75 @@ export const getExerciseInsight = async (exerciseName: string): Promise<Exercise
       const result = JSON.parse(response.text);
       Cache.set(cacheKey, result);
       return result;
+    }
+    return null;
+  }).catch(() => null);
+};
+
+export const askCoachQuestion = async ({
+  question,
+  profile,
+  logs,
+  plan,
+  history = []
+}: AskCoachInput): Promise<CoachChatResponse | null> => {
+  const normalizedQuestion = question.trim();
+  if (!normalizedQuestion) return null;
+
+  const context = {
+    profile: {
+      age: profile.age,
+      weight: profile.weight,
+      height: profile.height,
+      goal: profile.goal,
+      fitnessLevel: profile.fitnessLevel,
+      weightHistory: (profile.weightHistory || []).slice(-10)
+    },
+    recentLogs: summarizeLogsForCoach(logs),
+    currentPlan: summarizePlanForCoach(plan),
+    conversationHistory: history.slice(-6)
+  };
+
+  const cacheKey = Cache.stableKey('coach_chat', {
+    question: normalizedQuestion,
+    context
+  });
+  const cached = Cache.get(cacheKey);
+  if (cached) return cached;
+
+  return callWithRetry(async () => {
+    const ai = getAI();
+    const prompt = `
+你是一位专业健身教练和运动科学顾问。请根据用户提问和上下文数据，给出尽可能精准、可执行的建议。
+
+硬性要求：
+1) 全部使用中文，语气清晰、专业、简洁。
+2) 回答必须结合上下文数据，不要给空泛建议。若数据不足，先说明假设再给建议。
+3) 优先给出可量化的动作（组数、次数、时长、强度区间、频率）。
+4) 避免医疗诊断、药物建议、极端饮食。如出现疼痛/伤病征兆，放入 cautions 并建议线下就医评估。
+5) 输出严格遵循 JSON schema。
+
+用户提问：${normalizedQuestion}
+
+用户上下文数据：
+${JSON.stringify(context)}
+`;
+
+    const response = await ai.models.generateContent({
+      model: DEFAULT_MODEL,
+      contents: [{ parts: [{ text: prompt }] }],
+      config: { responseMimeType: "application/json", responseSchema: coachChatSchema }
+    });
+
+    if (response.text) {
+      const result = JSON.parse(response.text) as CoachChatResponse;
+      const normalizedResult: CoachChatResponse = {
+        answer: result.answer || "我暂时无法给出完整建议，请换个问法再试一次。",
+        actions: Array.isArray(result.actions) ? result.actions : [],
+        cautions: Array.isArray(result.cautions) ? result.cautions : []
+      };
+      Cache.set(cacheKey, normalizedResult);
+      return normalizedResult;
     }
     return null;
   }).catch(() => null);

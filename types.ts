@@ -59,6 +59,7 @@ export interface UserProfile {
   height: number; // cm
   goal: GoalType;
   fitnessLevel: '初学者' | '中级' | '高级';
+  weightHistory?: WeightEntry[];
 }
 
 export interface AIAdvice {
@@ -97,4 +98,15 @@ export interface ExerciseInsight {
   targetMuscles: string[];
   technicalPoints: string[];
   physiologicalPrinciple: string;
+}
+
+export interface CoachConversationMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface CoachChatResponse {
+  answer: string;
+  actions: string[];
+  cautions: string[];
 }

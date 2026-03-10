@@ -31,6 +31,12 @@ export const BrainIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+export const ChatIcon = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.76c0 1.6.84 3.1 2.2 3.95v3.04a.75.75 0 001.18.62l3.46-2.31c.45.1.92.15 1.4.15h1.04c4.28 0 7.75-2.88 7.75-6.43 0-3.55-3.47-6.43-7.75-6.43h-1.04c-4.28 0-7.75 2.88-7.75 6.43z" />
+  </svg>
+);
+
 export const DumbbellIcon = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M20.893 13.393l-1.135-1.135a2.252 2.252 0 01-.421-.585l-1.08-2.16a.414.414 0 00-.663-.107.827.827 0 01-.812.21l-1.273-.318a.75.75 0 01-.563-.727v-1.36a.75.75 0 01-.563-.727v-1.36a.75.75 0 00-1.5 0v1.36c0 .31-.192.594-.492.727l-1.273.318a.827.827 0 01-.812-.21.414.414 0 00-.663.107l-1.08 2.16a2.25 2.25 0 01-.421.585l-1.135 1.135a2.25 2.25 0 01-3.182 0l-2.95-2.95a2.25 2.25 0 010-3.182 2.25 2.25 0 013.182 0l2.95 2.95a2.25 2.25 0 010 3.182l1.135 1.135m0 0a2.25 2.25 0 003.182 0l2.95-2.95a2.25 2.25 0 000-3.182 2.25 2.25 0 00-3.182 0l-2.95 2.95a2.25 2.25 0 000 3.182l-1.135-1.135m-9.546-4.242l3.712 3.712" />
