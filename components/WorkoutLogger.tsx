@@ -206,8 +206,8 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
       
       <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+            <div className="min-w-0">
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">日期</label>
               <input 
                 type="date" 
@@ -216,7 +216,7 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
                 className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500 h-[48px]"
               />
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">训练标题</label>
               <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="如：今日练腿" className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500 h-[48px]" required />
             </div>
