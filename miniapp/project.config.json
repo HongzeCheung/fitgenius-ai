@@ -1,0 +1,17 @@
+{
+  "miniprogramRoot": "dist",
+  "projectname": "fitgenius-miniapp",
+  "appid": "touristappid",
+  "description": "FitGenius 微信小程序",
+  "compileType": "miniprogram",
+  "setting": {
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true,
+    "newFeature": true,
+    "packNpmRelationList": []
+  },
+  "simulatorType": "wechat",
+  "condition": {}
+}
