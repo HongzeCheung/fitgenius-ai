@@ -65,22 +65,6 @@ const App: React.FC = () => {
     setActiveView('dashboard');
   };
 
-  const handleWeightUpdate = async (newWeight: number) => {
-    setSyncStatus('syncing');
-    try {
-        const response = await backend.addWeightLog(newWeight);
-        setProfile(prev => ({
-          ...prev,
-          weight: newWeight,
-          weightHistory: response.weightHistory
-        }));
-        setSyncStatus('synced');
-        setTimeout(() => setSyncStatus('idle'), 3000);
-    } catch (e) {
-        setSyncStatus('error');
-    }
-  };
-
   const handleAddLog = async (newLog: WorkoutLog) => {
     setSyncStatus('syncing');
     try {
@@ -155,7 +139,7 @@ const App: React.FC = () => {
         
         return (
           <div className="space-y-8 animate-fade-in pb-20">
-            <Dashboard logs={sortedLogs} profile={profile} onWeightUpdate={handleWeightUpdate} />
+            <Dashboard logs={sortedLogs} profile={profile} />
             <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden mb-6">
                 <div className="p-6 border-b border-slate-50 flex justify-between items-center">
                   <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
