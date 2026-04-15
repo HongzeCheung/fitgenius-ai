@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="fitgenius-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00f3ff" />
+      <stop offset="100%" stop-color="#6a5cff" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#070b11" />
+  <path d="M18 14h28l-4 8H26v8h14l-4 8H26v12h-8V14Z" fill="url(#fitgenius-glow)" />
+  <path d="M34 50 46 26h-8l-12 24h8Z" fill="#ff3ca6" />
+</svg>

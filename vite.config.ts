@@ -10,19 +10,6 @@ export default defineConfig(({ mode }) => {
         host: '0.0.0.0',
       },
       plugins: [react()],
-      build: {
-        rollupOptions: {
-          output: {
-            manualChunks(id) {
-              if (!id.includes('node_modules')) return;
-
-              if (id.includes('@google/genai')) return 'ai-vendor';
-              if (id.includes('recharts')) return 'charts-vendor';
-              if (id.includes('react') || id.includes('scheduler')) return 'react-vendor';
-            }
-          }
-        }
-      },
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
