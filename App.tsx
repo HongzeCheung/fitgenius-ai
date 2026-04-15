@@ -18,6 +18,17 @@ const InlineLoader: React.FC<{ label: string; compact?: boolean }> = ({ label, c
   </div>
 );
 
+const matrixGlyphPool = '01アイウエオカキクケコサシスセソZXCVBNM#%';
+
+const matrixColumns = Array.from({ length: 16 }, (_, index) => ({
+  left: `${index * 6.2 + 1}%`,
+  delay: `${index * -0.07}s`,
+  duration: `${0.9 + (index % 5) * 0.16}s`,
+  content: Array.from({ length: 18 }, (_, glyphIndex) =>
+    matrixGlyphPool[(index * 5 + glyphIndex * 3) % matrixGlyphPool.length]
+  ).join(''),
+}));
+
 const App: React.FC = () => {
   const hasStoredToken = backend.hasToken();
 
@@ -38,42 +49,89 @@ const App: React.FC = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isAppLoading, setIsAppLoading] = useState(hasStoredToken);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
+  const [isHydratingSession, setIsHydratingSession] = useState(false);
+  const [isEntryTransitionActive, setIsEntryTransitionActive] = useState(false);
   const sortedLogs = useMemo(
     () => [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
     [logs]
   );
 
-  // Load initial data
-  const loadAppData = async () => {
+  const hydrateSessionData = async (surfaceSyncState = true) => {
     if (!backend.hasToken()) {
-        setIsAuthenticated(false);
-        setIsAppLoading(false);
-        return;
+      setIsAuthenticated(false);
+      setIsHydratingSession(false);
+      return;
     }
 
-    setIsAppLoading(true);
-    try {
+    setIsHydratingSession(true);
+    if (surfaceSyncState) {
+      setSyncStatus('syncing');
+    }
 
-        setIsAuthenticated(true);
-        const [fetchedLogs, fetchedProfile] = await Promise.all([
-          backend.getWorkoutLogs(),
-          backend.getUserProfile()
-        ]);
-        
-        if (fetchedLogs) setLogs(fetchedLogs);
-        if (fetchedProfile) setProfile(fetchedProfile);
+    try {
+      const [logsResult, profileResult] = await Promise.allSettled([
+        backend.getWorkoutLogs(),
+        backend.getUserProfile(),
+      ]);
+
+      if (logsResult.status === 'fulfilled' && logsResult.value) {
+        setLogs(logsResult.value);
+      }
+      if (profileResult.status === 'fulfilled' && profileResult.value) {
+        setProfile(profileResult.value);
+      }
+
+      if (surfaceSyncState) {
+        setSyncStatus('synced');
+        window.setTimeout(() => {
+          setSyncStatus(current => (current === 'synced' ? 'idle' : current));
+        }, 1500);
+      }
     } catch (e) {
-        console.error("Initialization failed", e);
+      console.error('Initialization failed', e);
+      if (surfaceSyncState) {
+        setSyncStatus('error');
+      }
     } finally {
-        setIsAppLoading(false);
+      setIsHydratingSession(false);
     }
   };
 
   useEffect(() => {
-    if (hasStoredToken) {
-      loadAppData();
+    if (!backend.hasToken()) {
+      setIsAppLoading(false);
+      return;
     }
-  }, [hasStoredToken]);
+
+    const loadExistingSession = async () => {
+      setIsAppLoading(true);
+      setIsAuthenticated(true);
+      try {
+        await hydrateSessionData(false);
+      } finally {
+        setIsAppLoading(false);
+      }
+    };
+
+    void loadExistingSession();
+  }, []);
+
+  useEffect(() => {
+    if (!isEntryTransitionActive) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setIsEntryTransitionActive(false);
+    }, 1450);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isEntryTransitionActive]);
+
+  const handleAuthSuccess = async () => {
+    setIsAuthenticated(true);
+    setActiveView('dashboard');
+    setIsEntryTransitionActive(true);
+    void hydrateSessionData();
+  };
 
   const handleLogout = () => {
     backend.logout();
@@ -146,7 +204,7 @@ const App: React.FC = () => {
   }
 
   if (!isAuthenticated) {
-      return <Auth onSuccess={loadAppData} />;
+      return <Auth onSuccess={handleAuthSuccess} />;
   }
 
   const renderContent = () => {
@@ -163,7 +221,17 @@ const App: React.FC = () => {
                   </h3>
                 </div>
                 <div>
-                  {sortedLogs.length === 0 && (
+                  {isHydratingSession && sortedLogs.length === 0 && (
+                      <div className="space-y-3 p-5">
+                        {Array.from({ length: 3 }).map((_, index) => (
+                          <div
+                            key={index}
+                            className="h-16 rounded-2xl border border-slate-100 bg-slate-50/80 animate-pulse"
+                          />
+                        ))}
+                      </div>
+                  )}
+                  {!isHydratingSession && sortedLogs.length === 0 && (
                       <div className="text-center py-12 text-slate-400 text-sm">暂无记录，点击下方 + 号开始记录</div>
                   )}
                   {sortedLogs.slice(0, 10).map((log, idx) => (
@@ -199,7 +267,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="h-screen bg-[#F2F5F8] flex flex-col overflow-hidden font-sans text-slate-800">
+    <div className={`app-runtime-shell h-screen bg-[#F2F5F8] flex flex-col overflow-hidden font-sans text-slate-800 ${isEntryTransitionActive ? 'app-runtime-shell-entry' : ''}`}>
       <header className="bg-white/90 backdrop-blur-md border-b border-slate-200 shrink-0 z-30 h-14 px-4 sticky top-0">
           <div className="max-w-md mx-auto w-full h-full flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -365,6 +433,34 @@ const App: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {isEntryTransitionActive && (
+        <div className="matrix-entry-overlay">
+          <div className="matrix-entry-wash" />
+          <div className="matrix-entry-core" />
+          <div className="matrix-entry-scanline" />
+          <div className="matrix-entry-grid" />
+          <div className="matrix-entry-glyphs">
+            {matrixColumns.map(column => (
+              <span
+                key={`${column.left}-${column.delay}`}
+                className="matrix-entry-column"
+                style={{
+                  left: column.left,
+                  animationDelay: column.delay,
+                  animationDuration: column.duration,
+                }}
+              >
+                {column.content}
+              </span>
+            ))}
+          </div>
+          <div className="matrix-entry-copy">
+            <span>ACCESS GRANTED</span>
+            <span className="matrix-entry-copy-sub">Routing consciousness to FitGenius...</span>
           </div>
         </div>
       )}

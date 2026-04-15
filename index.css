@@ -343,6 +343,292 @@ body {
   z-index: 2;
 }
 
+.auth-stage-shell {
+  isolation: isolate;
+}
+
+.auth-background-layer {
+  transform-origin: center;
+  transition: filter 0.28s ease, opacity 0.28s ease;
+}
+
+.auth-grid-layer {
+  transition: opacity 0.28s ease, filter 0.28s ease;
+}
+
+.auth-mainframe {
+  transition: filter 0.28s ease, opacity 0.28s ease;
+}
+
+.auth-cinematic-overlay {
+  opacity: 0;
+  transition: opacity 0.24s ease;
+}
+
+.auth-cinematic-overlay-active {
+  opacity: 1;
+}
+
+.auth-cinematic-darken,
+.auth-cinematic-vignette,
+.auth-cinematic-beam,
+.auth-cinematic-noise,
+.auth-cinematic-speedlines {
+  position: absolute;
+  inset: 0;
+}
+
+.auth-cinematic-darken {
+  background:
+    radial-gradient(circle at center, transparent 0 26%, rgba(4, 8, 16, 0.18) 68%, rgba(2, 4, 10, 0.5) 100%),
+    linear-gradient(180deg, rgba(1, 5, 14, 0.12), rgba(1, 6, 18, 0.56));
+  opacity: 0;
+  transition: opacity 0.24s ease;
+}
+
+.auth-cinematic-vignette {
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.5), transparent 16%, transparent 84%, rgba(0, 0, 0, 0.6)),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.3), transparent 18%, transparent 82%, rgba(0, 0, 0, 0.42));
+  opacity: 0.75;
+}
+
+.auth-cinematic-beam {
+  inset: -16%;
+  background: linear-gradient(90deg, transparent 0%, rgba(0, 243, 255, 0.22) 34%, rgba(255, 255, 255, 0.92) 50%, rgba(0, 243, 255, 0.22) 66%, transparent 100%);
+  filter: blur(12px);
+  mix-blend-mode: screen;
+  opacity: 0;
+  transform: translateX(-80%) skewX(-20deg);
+}
+
+.auth-cinematic-noise {
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0 2px, transparent 2px 4px),
+    linear-gradient(90deg, transparent, rgba(0, 243, 255, 0.06), transparent 70%);
+  opacity: 0;
+  mix-blend-mode: screen;
+}
+
+.auth-cinematic-speedlines {
+  inset: -12%;
+  background:
+    repeating-linear-gradient(102deg, transparent 0 54px, rgba(0, 243, 255, 0.12) 54px 56px, transparent 56px 112px),
+    repeating-linear-gradient(102deg, transparent 0 84px, rgba(255, 0, 255, 0.09) 84px 85px, transparent 85px 144px);
+  opacity: 0;
+  transform: translateX(-6%);
+  mix-blend-mode: screen;
+}
+
+.auth-stage-scanning .auth-background-layer {
+  filter: saturate(1.15) contrast(1.08) brightness(0.82);
+  animation: auth-bg-boost 1.6s ease-in-out infinite;
+}
+
+.auth-stage-breach .auth-background-layer {
+  filter: saturate(1.32) contrast(1.2) brightness(0.7) blur(0.4px);
+  animation: auth-bg-boost 0.72s linear infinite;
+}
+
+.auth-stage-scanning .auth-grid-layer {
+  filter: brightness(1.2);
+}
+
+.auth-stage-breach .auth-grid-layer {
+  filter: brightness(1.42);
+  animation: auth-grid-rush 0.85s linear infinite;
+}
+
+.auth-stage-scanning .auth-mainframe {
+  filter: brightness(0.96);
+  animation: auth-shell-shake 0.22s linear infinite;
+}
+
+.auth-stage-breach .auth-mainframe {
+  filter: brightness(0.92) saturate(1.05);
+  animation: auth-shell-shake 0.12s linear infinite;
+}
+
+.auth-stage-active .auth-cinematic-darken {
+  opacity: 1;
+}
+
+.auth-stage-scanning .auth-cinematic-beam {
+  opacity: 0.68;
+  animation: auth-scanner-sweep 0.92s cubic-bezier(0.15, 0.72, 0.3, 1) infinite;
+}
+
+.auth-stage-breach .auth-cinematic-beam {
+  opacity: 0.84;
+  animation: auth-scanner-sweep 0.48s cubic-bezier(0.15, 0.72, 0.3, 1) infinite;
+}
+
+.auth-stage-scanning .auth-cinematic-noise {
+  opacity: 0.22;
+  animation: auth-noise-flicker 0.34s steps(2, end) infinite;
+}
+
+.auth-stage-breach .auth-cinematic-noise {
+  opacity: 0.34;
+  animation: auth-noise-flicker 0.16s steps(2, end) infinite;
+}
+
+.auth-stage-scanning .auth-cinematic-speedlines {
+  opacity: 0.18;
+  animation: auth-speed-rush 1.2s linear infinite;
+}
+
+.auth-stage-breach .auth-cinematic-speedlines {
+  opacity: 0.34;
+  animation: auth-speed-rush 0.55s linear infinite;
+}
+
+.btn-scan-engaged {
+  filter: brightness(1.06) saturate(1.18);
+}
+
+.btn-scan-engaged::before {
+  transform: translateX(145%);
+  transition-duration: 0.45s;
+}
+
+.btn-scan-engaged::after {
+  opacity: 0.78;
+}
+
+.btn-scan-engaged-scanning {
+  box-shadow:
+    0 0 20px rgba(0, 243, 255, 0.22),
+    0 0 34px rgba(0, 243, 255, 0.14);
+}
+
+.btn-scan-engaged-breach {
+  animation: button-glitch 0.16s steps(2, end) 4, button-power 1s ease-in-out infinite;
+  box-shadow:
+    0 0 22px rgba(0, 243, 255, 0.26),
+    0 0 46px rgba(58, 123, 213, 0.26);
+}
+
+.protocol-status-rail {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 1.5rem;
+  padding: 0.15rem 0.1rem 0;
+}
+
+.protocol-status-ping {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: #00f3ff;
+  box-shadow:
+    0 0 12px rgba(0, 243, 255, 0.9),
+    0 0 26px rgba(0, 243, 255, 0.35);
+  animation: protocol-ping 1s ease-in-out infinite;
+}
+
+.app-runtime-shell {
+  position: relative;
+}
+
+.app-runtime-shell-entry {
+  animation: app-entry-emerge 1.05s cubic-bezier(0.16, 0.84, 0.18, 1) both;
+}
+
+.matrix-entry-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  overflow: hidden;
+  pointer-events: none;
+  animation: matrix-overlay-fade 1.45s cubic-bezier(0.16, 0.84, 0.18, 1) forwards;
+}
+
+.matrix-entry-wash,
+.matrix-entry-core,
+.matrix-entry-scanline,
+.matrix-entry-grid,
+.matrix-entry-glyphs,
+.matrix-entry-copy {
+  position: absolute;
+  inset: 0;
+}
+
+.matrix-entry-wash {
+  background:
+    linear-gradient(180deg, rgba(2, 9, 12, 0.96), rgba(2, 9, 12, 0.82)),
+    radial-gradient(circle at center, rgba(54, 255, 214, 0.18), transparent 42%);
+}
+
+.matrix-entry-core {
+  background: radial-gradient(circle at center, rgba(156, 255, 228, 0.28), rgba(19, 255, 190, 0.05) 20%, transparent 44%);
+  mix-blend-mode: screen;
+  animation: matrix-core-pulse 1.15s ease-out forwards;
+}
+
+.matrix-entry-scanline {
+  inset: -10% 0;
+  background: linear-gradient(180deg, transparent, rgba(169, 255, 226, 0.72), transparent);
+  filter: blur(10px);
+  opacity: 0;
+  animation: matrix-scan-wipe 0.95s cubic-bezier(0.12, 0.72, 0.2, 1) forwards;
+}
+
+.matrix-entry-grid {
+  background-image:
+    linear-gradient(to right, rgba(128, 255, 217, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(128, 255, 217, 0.08) 1px, transparent 1px);
+  background-size: 26px 26px;
+  opacity: 0.45;
+}
+
+.matrix-entry-glyphs {
+  overflow: hidden;
+}
+
+.matrix-entry-column {
+  position: absolute;
+  top: -26%;
+  white-space: pre;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 18px;
+  letter-spacing: 0.14em;
+  color: rgba(173, 255, 227, 0.92);
+  text-shadow:
+    0 0 10px rgba(106, 255, 214, 0.95),
+    0 0 24px rgba(106, 255, 214, 0.38);
+  opacity: 0;
+  animation-name: matrix-column-fall;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+.matrix-entry-copy {
+  inset: auto 0 18%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  color: #ddffef;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.92rem;
+  letter-spacing: 0.36em;
+  text-transform: uppercase;
+  text-shadow:
+    0 0 12px rgba(145, 255, 223, 0.82),
+    0 0 28px rgba(145, 255, 223, 0.28);
+  animation: matrix-copy-fade 1.1s ease-out forwards;
+}
+
+.matrix-entry-copy-sub {
+  font-size: 0.58rem;
+  letter-spacing: 0.3em;
+  color: rgba(220, 255, 241, 0.72);
+}
+
 @keyframes panel-flicker {
   0%,
   16%,
@@ -461,5 +747,194 @@ body {
 
   57% {
     transform: translateY(0);
+  }
+}
+
+@keyframes auth-bg-boost {
+  0%,
+  100% {
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+
+  40% {
+    transform: scale(1.04) translate3d(6px, -4px, 0);
+  }
+
+  72% {
+    transform: scale(1.08) translate3d(-10px, 4px, 0);
+  }
+}
+
+@keyframes auth-grid-rush {
+  0% {
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+
+  100% {
+    transform: scale(1.06) translate3d(12px, 18px, 0);
+  }
+}
+
+@keyframes auth-scanner-sweep {
+  0% {
+    transform: translateX(-82%) skewX(-20deg);
+  }
+
+  100% {
+    transform: translateX(82%) skewX(-20deg);
+  }
+}
+
+@keyframes auth-shell-shake {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+
+  25% {
+    transform: translate3d(-1px, 0.8px, 0);
+  }
+
+  50% {
+    transform: translate3d(1.2px, -0.8px, 0);
+  }
+
+  75% {
+    transform: translate3d(-0.8px, -0.6px, 0);
+  }
+}
+
+@keyframes auth-noise-flicker {
+  0%,
+  100% {
+    opacity: 0.08;
+  }
+
+  50% {
+    opacity: 0.28;
+  }
+}
+
+@keyframes auth-speed-rush {
+  0% {
+    transform: translateX(-6%);
+  }
+
+  100% {
+    transform: translateX(6%);
+  }
+}
+
+@keyframes protocol-ping {
+  0%,
+  100% {
+    transform: scale(0.82);
+    opacity: 0.7;
+  }
+
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+
+@keyframes button-power {
+  0%,
+  100% {
+    filter: brightness(1.05) saturate(1.18);
+  }
+
+  50% {
+    filter: brightness(1.14) saturate(1.3);
+  }
+}
+
+@keyframes app-entry-emerge {
+  0% {
+    filter: blur(10px) brightness(0.36) saturate(1.1);
+    transform: scale(1.02);
+  }
+
+  100% {
+    filter: blur(0) brightness(1) saturate(1);
+    transform: scale(1);
+  }
+}
+
+@keyframes matrix-overlay-fade {
+  0%,
+  60% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes matrix-core-pulse {
+  0% {
+    opacity: 0;
+    transform: scale(0.42);
+  }
+
+  24% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.26);
+  }
+}
+
+@keyframes matrix-scan-wipe {
+  0% {
+    opacity: 0;
+    transform: translateY(-110%);
+  }
+
+  18% {
+    opacity: 0.95;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(130%);
+  }
+}
+
+@keyframes matrix-column-fall {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -16%, 0);
+  }
+
+  18% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 132%, 0);
+  }
+}
+
+@keyframes matrix-copy-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  24%,
+  58% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
   }
 }
