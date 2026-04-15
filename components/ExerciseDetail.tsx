@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { WorkoutLog, ExerciseInsight, ExerciseLog } from '../types';
+import React, { useEffect, useMemo, useState } from 'react';
+import { WorkoutLog, ExerciseInsight } from '../types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { getExerciseInsight } from '../services/geminiService';
 import { Spinner } from './Spinner';
@@ -14,16 +14,16 @@ export const ExerciseDetail: React.FC<ExerciseDetailProps> = ({ logs }) => {
   const [loadingInsight, setLoadingInsight] = useState(false);
   const [error, setError] = useState(false);
 
-  // 提取所有不重复的动作
-  const allExercises = Array.from(new Set(
-      (logs || []).flatMap(log => (log.exercises || []).map(e => e.name))
-  ));
+  const allExercises = useMemo(
+    () => Array.from(new Set((logs || []).flatMap(log => (log.exercises || []).map(e => e.name)))),
+    [logs]
+  );
   
   useEffect(() => {
-    if (allExercises.length > 0 && !selectedExercise) {
+    if (allExercises.length > 0 && (!selectedExercise || !allExercises.includes(selectedExercise))) {
       setSelectedExercise(allExercises[0]);
     }
-  }, [logs]);
+  }, [allExercises, selectedExercise]);
 
   useEffect(() => {
     if (!selectedExercise) return;
@@ -43,28 +43,34 @@ export const ExerciseDetail: React.FC<ExerciseDetailProps> = ({ logs }) => {
      return <div className="text-center text-slate-400 py-20 font-bold">暂无详细动作数据</div>;
   }
 
-  // 获取选中动作的历史数据，并判断其主导类型
-  const selectedLogInstances = (logs || []).flatMap(log => 
-    (log.exercises || []).filter(e => e.name === selectedExercise).map(e => ({ ...e, date: log.date }))
+  const selectedLogInstances = useMemo(
+    () => (logs || []).flatMap(log =>
+      (log.exercises || []).filter(e => e.name === selectedExercise).map(e => ({ ...e, date: log.date }))
+    ),
+    [logs, selectedExercise]
   );
   
-  // 如果大部分记录是有氧模式，则按时长绘图
-  const isMainlyCardio = selectedLogInstances.filter(e => e.type === 'cardio').length > selectedLogInstances.length / 2;
+  const isMainlyCardio = useMemo(
+    () => selectedLogInstances.filter(e => e.type === 'cardio').length > selectedLogInstances.length / 2,
+    [selectedLogInstances]
+  );
 
-  const exerciseHistory = (logs || [])
-    .filter(log => log.exercises && log.exercises.some(e => e.name === selectedExercise))
-    .map(log => {
-      const ex = log.exercises.find(e => e.name === selectedExercise)!;
-      const sets = ex.sets || [];
-      
-      if (ex.type === 'cardio') {
-        return {
-          date: new Date(log.date).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }),
-          value: sets[0]?.duration || 0,
-          label: '时长',
-          unit: 'min'
-        };
-      } else {
+  const exerciseHistory = useMemo(
+    () => (logs || [])
+      .filter(log => log.exercises && log.exercises.some(e => e.name === selectedExercise))
+      .map(log => {
+        const ex = log.exercises.find(e => e.name === selectedExercise)!;
+        const sets = ex.sets || [];
+        
+        if (ex.type === 'cardio') {
+          return {
+            date: new Date(log.date).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }),
+            value: sets[0]?.duration || 0,
+            label: '时长',
+            unit: 'min'
+          };
+        }
+
         const maxWeight = sets.length > 0 ? Math.max(...sets.map(s => Number(s.weight) || 0)) : 0;
         return {
           date: new Date(log.date).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }),
@@ -72,9 +78,10 @@ export const ExerciseDetail: React.FC<ExerciseDetailProps> = ({ logs }) => {
           label: '最大负重',
           unit: 'kg'
         };
-      }
-    })
-    .reverse();
+      })
+      .reverse(),
+    [logs, selectedExercise]
+  );
 
   return (
     <div className="space-y-6 pb-24 animate-fade-in">

@@ -1,18 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import { Dashboard } from './components/Dashboard';
-import { WorkoutLogger } from './components/WorkoutLogger';
-import { AICoach } from './components/AICoach';
-import { AnalysisReport } from './components/AnalysisReport';
-import { ExerciseDetail } from './components/ExerciseDetail';
+import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Auth } from './components/Auth';
 import { WorkoutLog, UserProfile, GoalType } from './types';
 import { HomeIcon, DumbbellIcon, BrainIcon, UserIcon, PlusIcon, CloseIcon, CloudIcon, SyncIcon, CheckCircleIcon, AnalysisIcon, LogOutIcon, GithubIcon } from './components/Icons';
 import { backend } from './services/backend';
 import { Spinner } from './components/Spinner';
 
+const Dashboard = lazy(() => import('./components/Dashboard').then(module => ({ default: module.Dashboard })));
+const WorkoutLogger = lazy(() => import('./components/WorkoutLogger').then(module => ({ default: module.WorkoutLogger })));
+const AICoach = lazy(() => import('./components/AICoach').then(module => ({ default: module.AICoach })));
+const AnalysisReport = lazy(() => import('./components/AnalysisReport').then(module => ({ default: module.AnalysisReport })));
+const ExerciseDetail = lazy(() => import('./components/ExerciseDetail').then(module => ({ default: module.ExerciseDetail })));
+
+const InlineLoader: React.FC<{ label: string; compact?: boolean }> = ({ label, compact = false }) => (
+  <div className={`flex flex-col items-center justify-center space-y-4 ${compact ? 'py-12' : 'min-h-[320px]'}`}>
+    <Spinner />
+    <p className="text-slate-500 font-medium animate-pulse text-sm">{label}</p>
+  </div>
+);
+
 const App: React.FC = () => {
+  const hasStoredToken = backend.hasToken();
+
   // State
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(hasStoredToken);
   const [activeView, setActiveView] = useState<'dashboard' | 'coach' | 'report' | 'exercises'>('dashboard');
   const [logs, setLogs] = useState<WorkoutLog[]>([]);
   const [isLoggerOpen, setIsLoggerOpen] = useState(false);
@@ -26,18 +36,23 @@ const App: React.FC = () => {
     weightHistory: []
   });
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isAppLoading, setIsAppLoading] = useState(true);
+  const [isAppLoading, setIsAppLoading] = useState(hasStoredToken);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
+  const sortedLogs = useMemo(
+    () => [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    [logs]
+  );
 
   // Load initial data
   const loadAppData = async () => {
+    if (!backend.hasToken()) {
+        setIsAuthenticated(false);
+        setIsAppLoading(false);
+        return;
+    }
+
     setIsAppLoading(true);
     try {
-        if (!backend.hasToken()) {
-            setIsAuthenticated(false);
-            setIsAppLoading(false);
-            return;
-        }
 
         setIsAuthenticated(true);
         const [fetchedLogs, fetchedProfile] = await Promise.all([
@@ -55,8 +70,10 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    loadAppData();
-  }, []);
+    if (hasStoredToken) {
+      loadAppData();
+    }
+  }, [hasStoredToken]);
 
   const handleLogout = () => {
     backend.logout();
@@ -135,8 +152,6 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (activeView) {
       case 'dashboard':
-        const sortedLogs = [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        
         return (
           <div className="space-y-8 animate-fade-in pb-20">
             <Dashboard logs={sortedLogs} profile={profile} />
@@ -243,7 +258,9 @@ const App: React.FC = () => {
                 "智能训练建议"}
                 </p>
             </div>
-            {renderContent()}
+            <Suspense fallback={<InlineLoader label="正在载入模块..." />}>
+              {renderContent()}
+            </Suspense>
         </div>
       </main>
 
@@ -279,11 +296,13 @@ const App: React.FC = () => {
       {isLoggerOpen && (
         <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-50 flex items-end justify-center animate-fade-in">
            <div className="w-full max-w-md animate-slide-up">
-            <WorkoutLogger 
-              onAddLog={handleAddLog} 
-              onClose={() => setIsLoggerOpen(false)}
-              userWeight={profile.weight}
-            />
+            <Suspense fallback={<div className="bg-white rounded-t-3xl w-full max-w-lg mx-auto overflow-hidden flex items-center justify-center h-[40vh] shadow-2xl"><InlineLoader label="正在载入记录器..." compact /></div>}>
+              <WorkoutLogger 
+                onAddLog={handleAddLog} 
+                onClose={() => setIsLoggerOpen(false)}
+                userWeight={profile.weight}
+              />
+            </Suspense>
           </div>
         </div>
       )}
