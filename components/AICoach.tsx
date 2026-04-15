@@ -3,7 +3,7 @@ import { UserProfile, WorkoutLog, WorkoutPlan, AIAdvice } from '../types';
 import { generateFitnessPlan, analyzeWorkoutHistory, askCoachQuestion } from '../services/geminiService';
 import { backend } from '../services/backend';
 import { Spinner } from './Spinner';
-import { BrainIcon, CalendarIcon, CheckCircleIcon, ChatIcon } from './Icons';
+import { BrainIcon, CalendarIcon, CheckCircleIcon, ChatIcon, CloseIcon } from './Icons';
 
 interface AICoachProps {
   profile: UserProfile;
@@ -36,6 +36,8 @@ export const AICoach: React.FC<AICoachProps> = ({ profile, logs }) => {
   // Plan State
   const [currentPlan, setCurrentPlan] = useState<WorkoutPlan | null>(null); // From Backend
   const [draftPlan, setDraftPlan] = useState<WorkoutPlan | null>(null);     // From AI (Unsaved)
+  const [isDraftConfirmOpen, setIsDraftConfirmOpen] = useState(false);
+  const [isRegenerateConfirmOpen, setIsRegenerateConfirmOpen] = useState(false);
   
   // Analysis State
   const [advice, setAdvice] = useState<AIAdvice | null>(null);
@@ -64,6 +66,7 @@ export const AICoach: React.FC<AICoachProps> = ({ profile, logs }) => {
     setLoading(true);
     const result = await generateFitnessPlan(profile);
     setDraftPlan(result); // Set as draft first
+    setIsDraftConfirmOpen(!!result);
     setLoading(false);
   };
 
@@ -73,6 +76,7 @@ export const AICoach: React.FC<AICoachProps> = ({ profile, logs }) => {
     try {
       await backend.saveActivePlan(draftPlan);
       setCurrentPlan(draftPlan);
+      setIsDraftConfirmOpen(false);
       setDraftPlan(null); // Clear draft, now it is current
     } catch (e) {
       console.error("Failed to save plan", e);
@@ -82,7 +86,13 @@ export const AICoach: React.FC<AICoachProps> = ({ profile, logs }) => {
   };
 
   const handleDiscardDraft = () => {
+    setIsDraftConfirmOpen(false);
     setDraftPlan(null);
+  };
+
+  const handleConfirmRegenerate = async () => {
+    setIsRegenerateConfirmOpen(false);
+    await handleGeneratePlan();
   };
 
   const handleAnalyze = async () => {
@@ -96,6 +106,20 @@ export const AICoach: React.FC<AICoachProps> = ({ profile, logs }) => {
     if (!chatBodyRef.current) return;
     chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
   }, [chatMessages, chatLoading, activeTab]);
+
+  useEffect(() => {
+    if (!isDraftConfirmOpen && !isRegenerateConfirmOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsDraftConfirmOpen(false);
+        setIsRegenerateConfirmOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isDraftConfirmOpen, isRegenerateConfirmOpen]);
 
   const handleSendChat = async (presetQuestion?: string) => {
     const question = (presetQuestion ?? chatInput).trim();
@@ -153,83 +177,249 @@ export const AICoach: React.FC<AICoachProps> = ({ profile, logs }) => {
   };
 
   // Helper to render a plan card
-  const renderPlanDetails = (plan: WorkoutPlan, isDraft: boolean) => (
-    <div className="animate-fade-in relative">
-        {isDraft && (
-            <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-xl mb-6 flex items-center gap-2 text-sm font-bold">
-                <span className="animate-pulse">●</span> 这是一个预览草稿，请点击底部按钮保存。
+  const renderPlanDetails = (plan: WorkoutPlan, isDraft: boolean) => {
+    const totalDuration = plan.schedule.reduce((sum, day) => sum + day.duration, 0);
+    const focusPreview = Array.from(new Set(plan.schedule.map(day => day.focus))).slice(0, 3);
+
+    return (
+      <div className="animate-fade-in relative">
+        {isDraft && !isDraftConfirmOpen && (
+          <div className="mb-6 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50 to-white p-4 shadow-sm">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-indigo-500">Draft Plan</p>
+                <p className="mt-1 text-sm font-bold text-slate-700">
+                  这是一份未保存草稿，你可以继续预览，或重新打开确认弹窗后保存到云端。
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setIsDraftConfirmOpen(true)}
+                  className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-indigo-100 transition-colors hover:bg-indigo-700"
+                >
+                  打开确认框
+                </button>
+                <button
+                  onClick={handleDiscardDraft}
+                  className="rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-slate-500 ring-1 ring-slate-200 transition-colors hover:bg-slate-50"
+                >
+                  放弃草稿
+                </button>
+              </div>
             </div>
+          </div>
         )}
 
         <div className="flex justify-between items-start mb-8 border-b border-slate-100 pb-6">
-            <div>
+          <div>
             <h2 className="text-2xl font-extrabold text-slate-800 mb-1">{plan.title}</h2>
             <span className="px-3 py-1 bg-indigo-50 text-indigo-600 text-xs font-bold rounded-full uppercase tracking-wide">{plan.goal}</span>
-            </div>
-            {!isDraft && (
-                <button 
-                    onClick={() => {
-                        if(window.confirm('确定要重新生成吗？当前计划将被覆盖。')) {
-                            handleGeneratePlan();
-                        }
-                    }} 
-                    className="text-sm text-slate-400 hover:text-indigo-600 transition-colors font-medium"
-                >
-                    重新生成
-                </button>
-            )}
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            {plan.schedule.map((day, idx) => (
-            <div key={idx} className="bg-slate-50 p-6 rounded-2xl border border-slate-100 hover:border-indigo-200 transition-colors group">
-                <div className="flex justify-between items-center mb-4">
-                <span className="text-slate-800 font-bold text-lg">{day.day}</span>
-                <span className="text-xs bg-white border border-slate-200 text-slate-500 px-2.5 py-1 rounded-lg font-medium">{day.duration} 分钟</span>
-                </div>
-                <div className="text-sm text-indigo-600 font-bold mb-3 uppercase tracking-wider">{day.focus}</div>
-                <ul className="space-y-2 mb-4">
-                {day.exercises.map((ex, i) => (
-                    <li key={i} className="text-slate-600 text-sm flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 bg-indigo-300 rounded-full mt-1.5 flex-shrink-0"></span>
-                    {ex}
-                    </li>
-                ))}
-                </ul>
-                {day.notes && (
-                <div className="bg-white p-3 rounded-xl border border-slate-100">
-                    <p className="text-xs text-slate-500 italic">💡 {day.notes}</p>
-                </div>
-                )}
-            </div>
-            ))}
+          </div>
+          {!isDraft && (
+            <button
+              onClick={() => setIsRegenerateConfirmOpen(true)}
+              className="text-sm text-slate-400 hover:text-indigo-600 transition-colors font-medium"
+            >
+              重新生成
+            </button>
+          )}
         </div>
 
-        {isDraft && (
-            <div className="sticky bottom-4 bg-white/90 backdrop-blur border border-slate-200 p-4 rounded-2xl shadow-2xl flex gap-4 items-center justify-between">
-                <div className="text-sm text-slate-500 font-medium pl-2 hidden sm:block">
-                    满意这个计划吗？
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          {plan.schedule.map((day, idx) => (
+            <div key={idx} className="bg-slate-50 p-6 rounded-2xl border border-slate-100 hover:border-indigo-200 transition-colors group">
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-slate-800 font-bold text-lg">{day.day}</span>
+                <span className="text-xs bg-white border border-slate-200 text-slate-500 px-2.5 py-1 rounded-lg font-medium">{day.duration} 分钟</span>
+              </div>
+              <div className="text-sm text-indigo-600 font-bold mb-3 uppercase tracking-wider">{day.focus}</div>
+              <ul className="space-y-2 mb-4">
+                {day.exercises.map((ex, i) => (
+                  <li key={i} className="text-slate-600 text-sm flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 bg-indigo-300 rounded-full mt-1.5 flex-shrink-0"></span>
+                    {ex}
+                  </li>
+                ))}
+              </ul>
+              {day.notes && (
+                <div className="bg-white p-3 rounded-xl border border-slate-100">
+                  <p className="text-xs text-slate-500 italic">💡 {day.notes}</p>
                 </div>
-                <div className="flex gap-3 w-full sm:w-auto">
-                    <button 
-                        onClick={handleDiscardDraft}
-                        className="flex-1 sm:flex-none px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold transition-colors"
-                    >
-                        放弃
-                    </button>
-                    <button 
-                        onClick={handleConfirmPlan}
-                        disabled={saving}
-                        className="flex-1 sm:flex-none px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2"
-                    >
-                        {saving ? <Spinner /> : <CheckCircleIcon className="w-5 h-5" />}
-                        {saving ? '保存中...' : '确认并保存计划'}
-                    </button>
-                </div>
+              )}
             </div>
+          ))}
+        </div>
+
+        {isDraft && isDraftConfirmOpen && (
+          <>
+            <div
+              className="fixed inset-0 z-30 bg-slate-900/30 backdrop-blur-[6px] animate-fade-in"
+              onClick={() => setIsDraftConfirmOpen(false)}
+            />
+            <div className="fixed inset-0 z-40 flex items-center justify-center p-4 sm:p-6">
+              <div
+                className="w-full max-w-2xl rounded-[2rem] border border-slate-200 bg-white/95 p-6 shadow-[0_32px_90px_rgba(15,23,42,0.22)] backdrop-blur-xl animate-slide-up sm:min-h-[300px] sm:p-8"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="flex h-full flex-col justify-between gap-8">
+                  <div>
+                    <div className="mb-6 flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-4">
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 shadow-sm">
+                          <CheckCircleIcon className="w-7 h-7" />
+                        </div>
+                        <div className="pt-1">
+                          <p className="text-[10px] font-black uppercase tracking-[0.28em] text-indigo-500">Save Protocol</p>
+                          <h3 className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight sm:text-[30px]">确认保存这份计划</h3>
+                          <p className="mt-2 text-sm leading-relaxed text-slate-500 sm:text-base">
+                            当前展示的是 AI 生成的预览草稿。你可以先关闭弹窗继续检查细节，也可以直接确认并覆盖现有云端计划。
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setIsDraftConfirmOpen(false)}
+                        className="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                        aria-label="关闭确认弹窗"
+                      >
+                        <CloseIcon className="h-5 w-5" />
+                      </button>
+                    </div>
+
+                    <div className="grid gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-4 sm:grid-cols-3">
+                      <div className="rounded-2xl bg-white px-4 py-4 shadow-sm ring-1 ring-slate-100">
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">计划目标</p>
+                        <p className="mt-2 text-base font-bold text-slate-800">{plan.goal}</p>
+                      </div>
+                      <div className="rounded-2xl bg-white px-4 py-4 shadow-sm ring-1 ring-slate-100">
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">训练频次</p>
+                        <p className="mt-2 text-base font-bold text-slate-800">{plan.schedule.length} 天</p>
+                      </div>
+                      <div className="rounded-2xl bg-white px-4 py-4 shadow-sm ring-1 ring-slate-100">
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">总时长</p>
+                        <p className="mt-2 text-base font-bold text-slate-800">{totalDuration} 分钟</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {focusPreview.map(focus => (
+                        <span key={focus} className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-600 ring-1 ring-indigo-100">
+                          {focus}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-[150px_150px_minmax(0,1fr)]">
+                    <button
+                      onClick={() => setIsDraftConfirmOpen(false)}
+                      className="min-h-[58px] rounded-2xl bg-white px-5 py-4 text-base font-bold text-slate-500 ring-1 ring-slate-200 transition-colors hover:bg-slate-50"
+                    >
+                      稍后再说
+                    </button>
+                    <button
+                      onClick={handleDiscardDraft}
+                      className="min-h-[58px] rounded-2xl bg-slate-100 px-5 py-4 text-base font-bold text-slate-600 transition-colors hover:bg-slate-200"
+                    >
+                      放弃草稿
+                    </button>
+                    <button
+                      onClick={handleConfirmPlan}
+                      disabled={saving}
+                      className="flex min-h-[58px] items-center justify-center gap-3 rounded-2xl bg-indigo-600 px-8 py-4 text-lg font-bold text-white shadow-lg shadow-indigo-200 transition-all hover:bg-indigo-700"
+                    >
+                      {saving ? <Spinner /> : <CheckCircleIcon className="w-6 h-6" />}
+                      {saving ? '保存中...' : '确认并保存计划'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
         )}
-    </div>
-  );
+
+        {!isDraft && isRegenerateConfirmOpen && (
+          <>
+            <div
+              className="fixed inset-0 z-30 bg-slate-900/30 backdrop-blur-[6px] animate-fade-in"
+              onClick={() => setIsRegenerateConfirmOpen(false)}
+            />
+            <div className="fixed inset-0 z-40 flex items-center justify-center p-4 sm:p-6">
+              <div
+                className="w-full max-w-2xl rounded-[2rem] border border-slate-200 bg-white/95 p-6 shadow-[0_32px_90px_rgba(15,23,42,0.22)] backdrop-blur-xl animate-slide-up sm:min-h-[300px] sm:p-8"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="flex h-full flex-col justify-between gap-8">
+                  <div>
+                    <div className="mb-6 flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-4">
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-violet-50 text-violet-600 shadow-sm">
+                          <CalendarIcon className="w-7 h-7" />
+                        </div>
+                        <div className="pt-1">
+                          <p className="text-[10px] font-black uppercase tracking-[0.28em] text-violet-500">Regenerate Plan</p>
+                          <h3 className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight sm:text-[30px]">确认重新生成计划</h3>
+                          <p className="mt-2 text-sm leading-relaxed text-slate-500 sm:text-base">
+                            系统会先生成一份新的预览草稿，不会立即覆盖当前云端计划。只有当你后续确认保存新草稿时，正式计划才会被替换。
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setIsRegenerateConfirmOpen(false)}
+                        className="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                        aria-label="关闭重新生成弹窗"
+                      >
+                        <CloseIcon className="h-5 w-5" />
+                      </button>
+                    </div>
+
+                    <div className="grid gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-4 sm:grid-cols-3">
+                      <div className="rounded-2xl bg-white px-4 py-4 shadow-sm ring-1 ring-slate-100">
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">当前目标</p>
+                        <p className="mt-2 text-base font-bold text-slate-800">{plan.goal}</p>
+                      </div>
+                      <div className="rounded-2xl bg-white px-4 py-4 shadow-sm ring-1 ring-slate-100">
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">当前频次</p>
+                        <p className="mt-2 text-base font-bold text-slate-800">{plan.schedule.length} 天</p>
+                      </div>
+                      <div className="rounded-2xl bg-white px-4 py-4 shadow-sm ring-1 ring-slate-100">
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">当前总时长</p>
+                        <p className="mt-2 text-base font-bold text-slate-800">{totalDuration} 分钟</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {focusPreview.map(focus => (
+                        <span key={focus} className="rounded-full bg-violet-50 px-3 py-1 text-xs font-bold text-violet-600 ring-1 ring-violet-100">
+                          {focus}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-[160px_minmax(0,1fr)]">
+                    <button
+                      onClick={() => setIsRegenerateConfirmOpen(false)}
+                      className="min-h-[58px] rounded-2xl bg-white px-5 py-4 text-base font-bold text-slate-500 ring-1 ring-slate-200 transition-colors hover:bg-slate-50"
+                    >
+                      取消
+                    </button>
+                    <button
+                      onClick={handleConfirmRegenerate}
+                      disabled={loading}
+                      className="flex min-h-[58px] items-center justify-center gap-3 rounded-2xl bg-violet-600 px-8 py-4 text-lg font-bold text-white shadow-lg shadow-violet-200 transition-all hover:bg-violet-700 disabled:opacity-60"
+                    >
+                      {loading ? <Spinner /> : <CalendarIcon className="w-6 h-6" />}
+                      {loading ? '生成中...' : '重新生成草稿'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">

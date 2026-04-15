@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { XAxis, YAxis, ResponsiveContainer, RadialBarChart, RadialBar } from 'recharts';
 import { WorkoutLog, UserProfile } from '../types';
 import { ActivityIcon } from './Icons';
@@ -10,36 +10,39 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ logs, profile }) => {
-
-  const safeLogs = Array.isArray(logs) ? logs : [];
+  const safeLogs = useMemo(() => (Array.isArray(logs) ? logs : []), [logs]);
   const totalWorkouts = safeLogs.length;
-  const totalMinutes = safeLogs.reduce((acc, log) => acc + (Number(log.duration) || 0), 0);
-
-  const generateLast7DaysData = () => {
-    const data = [];
-    const now = new Date();
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toDateString();
-      const dayLabel = d.toLocaleDateString('zh-CN', { weekday: 'short' });
-      const dayLogs = safeLogs.filter(log => new Date(log.date).toDateString() === dateStr);
-      const dayCalories = dayLogs.reduce((acc, log) => acc + (Number(log.calories) || 0), 0);
-      const dayMinutes = dayLogs.reduce((acc, log) => acc + (Number(log.duration) || 0), 0);
-      
-      data.push({
-        name: dayLabel,
-        calories: dayCalories,
-        minutes: dayMinutes,
-        fullDate: d.toLocaleDateString('zh-CN')
-      });
-    }
-    return data;
-  };
+  const totalMinutes = useMemo(
+    () => safeLogs.reduce((acc, log) => acc + (Number(log.duration) || 0), 0),
+    [safeLogs]
+  );
 
   const calorieGoal = 500;
   const durationGoal = 60;
-  const chartData = generateLast7DaysData();
+  const chartData = useMemo(() => {
+    const groupedByDay = safeLogs.reduce<Record<string, { calories: number; minutes: number }>>((acc, log) => {
+      const dayKey = new Date(log.date).toDateString();
+      const dayEntry = acc[dayKey] || { calories: 0, minutes: 0 };
+      dayEntry.calories += Number(log.calories) || 0;
+      dayEntry.minutes += Number(log.duration) || 0;
+      acc[dayKey] = dayEntry;
+      return acc;
+    }, {});
+
+    return Array.from({ length: 7 }, (_, index) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - index));
+      const dayKey = d.toDateString();
+      const dayData = groupedByDay[dayKey] || { calories: 0, minutes: 0 };
+
+      return {
+        name: d.toLocaleDateString('zh-CN', { weekday: 'short' }),
+        calories: dayData.calories,
+        minutes: dayData.minutes,
+        fullDate: d.toLocaleDateString('zh-CN')
+      };
+    });
+  }, [safeLogs]);
   const todayStats = chartData[chartData.length - 1];
   
   const ringsData = [

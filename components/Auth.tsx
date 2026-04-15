@@ -1,11 +1,26 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { backend } from '../services/backend';
-import { LockIcon, UserIcon, CheckCircleIcon } from './Icons';
-import { Spinner } from './Spinner';
+import backgroundImage from '../background.jpg';
 
 interface AuthProps {
   onSuccess: () => void;
 }
+
+const protocolTags = [
+  { label: 'Adaptive Training', tone: 'cyan' },
+  { label: 'AI Coaching', tone: 'pink' },
+  { label: 'Cloud Sync', tone: 'slate' },
+] as const;
+
+const particles = Array.from({ length: 16 }, (_, index) => ({
+  left: `${4 + index * 6}%`,
+  delay: `${(index % 5) * -1.3}s`,
+  duration: `${9 + (index % 6) * 1.2}s`,
+  height: `${24 + (index % 4) * 26}px`,
+  opacity: 0.18 + (index % 3) * 0.1,
+}));
+
+const createHexCode = () => `0x${Math.random().toString(16).slice(2, 6).toUpperCase()}`;
 
 export const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
   const [isLogin, setIsLogin] = useState(true);
@@ -13,30 +28,48 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [keepLinked, setKeepLinked] = useState(true);
+  const [parallax, setParallax] = useState({ x: 0, y: 0 });
+  const [hexCodes, setHexCodes] = useState(() => protocolTags.map(() => createHexCode()));
 
-  // 密码强度校验逻辑
-  const passwordCriteria = useMemo(() => {
-    return {
+  const passwordCriteria = useMemo(
+    () => ({
       length: password.length >= 8,
       hasNumber: /\d/.test(password),
-      hasSymbol: /[!@#$%^&*(),.?":{}|<>]/.test(password)
-    };
-  }, [password]);
+      hasSymbol: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+    }),
+    [password]
+  );
 
-  const isPasswordSecure = !isLogin ? (passwordCriteria.length && passwordCriteria.hasNumber) : true;
+  const isPasswordSecure = isLogin ? true : passwordCriteria.length && passwordCriteria.hasNumber;
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setHexCodes(protocolTags.map(() => createHexCode()));
+    }, 1400);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  const handleSceneMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 24;
+    const y = ((e.clientY - rect.top) / rect.height - 0.5) * 18;
+    setParallax({ x, y });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username || !password) return;
-    
+
     if (!isLogin && !isPasswordSecure) {
-      setError('为了您的安全，请设置符合要求的密码');
+      setError('注册协议要求密码至少 8 位且包含数字。');
       return;
     }
 
     setLoading(true);
     setError(null);
-    
+
     try {
       if (isLogin) {
         await backend.login(username, password);
@@ -45,112 +78,243 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
       }
       onSuccess();
     } catch (err: any) {
-      setError(err.message || '操作失败，请重试');
+      setError(err.message || '协议验证失败，请稍后重试。');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#F2F5F8] flex items-center justify-center p-6">
-      <div className="w-full max-w-md animate-fade-in">
-        <div className="text-center mb-10">
-          <div className={`w-20 h-20 rounded-3xl shadow-xl flex items-center justify-center mx-auto mb-6 transform rotate-3 transition-colors duration-500 ${isLogin ? 'bg-indigo-600 shadow-indigo-200' : 'bg-purple-600 shadow-purple-200'}`}>
-             <LockIcon className="w-10 h-10 text-white" />
-          </div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">FitGenius AI</h1>
-          <p className="text-slate-500 font-medium">{isLogin ? '您的智能私教，数据由您掌握' : '开启您的数字化健身体验'}</p>
-        </div>
+    <div
+      className="relative min-h-screen overflow-hidden bg-[#050505] text-white"
+      onMouseMove={handleSceneMove}
+      onMouseLeave={() => setParallax({ x: 0, y: 0 })}
+    >
+      <div
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat will-change-transform"
+        style={{
+          backgroundImage: `url(${backgroundImage})`,
+          transform: `translate3d(${parallax.x * -0.3}px, ${parallax.y * -0.3}px, 0) scale(1.05)`,
+        }}
+      />
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(circle at top, rgba(0, 243, 255, 0.12), transparent 30%), linear-gradient(90deg, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.45) 45%, rgba(0, 0, 0, 0.72))',
+        }}
+      />
+      <div
+        className="absolute inset-0 bg-grid opacity-80"
+        style={{ transform: `translate3d(${parallax.x * -0.12}px, ${parallax.y * -0.12}px, 0)` }}
+      />
 
-        <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100">
-          <div className="flex p-1 bg-slate-50 rounded-2xl mb-8">
-            <button 
-              onClick={() => { setIsLogin(true); setError(null); }}
-              className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${isLogin ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-              登录
-            </button>
-            <button 
-              onClick={() => { setIsLogin(false); setError(null); }}
-              className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${!isLogin ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-              快速注册
-            </button>
-          </div>
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        {particles.map((particle, index) => (
+          <span
+            key={`${particle.left}-${index}`}
+            className="cyber-particle"
+            style={{
+              left: particle.left,
+              height: particle.height,
+              opacity: particle.opacity,
+              animationDelay: particle.delay,
+              animationDuration: particle.duration,
+            }}
+          />
+        ))}
+      </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+      <div
+        className="pointer-events-none fixed left-0 top-0 h-full w-full opacity-30"
+        style={{ transform: `translate3d(${parallax.x * 0.15}px, ${parallax.y * 0.15}px, 0)` }}
+      >
+        <div className="absolute -left-20 top-1/4 h-96 w-96 rounded-full bg-cyan-500 blur-[120px]" />
+        <div className="absolute -right-20 bottom-1/4 h-96 w-96 rounded-full bg-pink-500 blur-[120px]" />
+      </div>
+
+      <main className="relative z-10 mx-auto grid min-h-screen max-w-6xl grid-cols-1 items-center gap-12 px-4 py-8 md:grid-cols-[1.05fr_0.95fr]">
+        <section
+          className="space-y-7"
+          style={{ transform: `translate3d(${parallax.x * 0.2}px, ${parallax.y * 0.2}px, 0)` }}
+        >
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 items-center justify-center border-2 border-cyan-400 rotate-45 shadow-[0_0_24px_rgba(0,243,255,0.22)]">
+              <span className="font-orbitron neon-text -rotate-45 text-2xl font-bold">N</span>
+            </div>
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">用户名</label>
-              <div className="relative">
-                <input 
-                  type="text" 
-                  value={username}
-                  onChange={e => setUsername(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-medium"
-                  placeholder="创建您的账号名称"
-                  required
-                />
-                <UserIcon className="absolute right-4 top-4 w-5 h-5 text-slate-300" />
+              <h1 className="font-orbitron text-3xl font-bold uppercase text-white md:text-[2.2rem]">
+                <span className="tracking-[0.22em]">FIT</span>{' '}
+                <span className="signal-word tracking-[0.22em]" data-text="GENNIUS">
+                  GENNIUS
+                </span>
+              </h1>
+              <p className="font-orbitron text-xs uppercase tracking-[0.38em] text-slate-400/80">
+                Fit Gennius Access Portal
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h2 className="font-orbitron neon-text text-5xl font-bold italic uppercase leading-[0.95] md:text-7xl">
+              Ascend.
+              <br />
+              Evolve.
+              <br />
+              Conquer.
+            </h2>
+          </div>
+
+          <div className="story-shield max-w-lg rounded-r-3xl border-l-2 border-pink-500/80 px-5 py-4">
+            <p className="story-copy text-lg leading-relaxed text-slate-200/95">
+              解锁你的数字潜能。在虚拟网络中重塑肉身极限，让每一卡路里都转化为计算力。
+            </p>
+          </div>
+
+          <div className="grid max-w-xl gap-3 pt-2 sm:grid-cols-3">
+            {protocolTags.map((tag, index) => (
+              <div
+                key={tag.label}
+                className={`tag-panel ${tag.tone === 'cyan' ? 'tag-panel-cyan' : tag.tone === 'pink' ? 'tag-panel-pink' : 'tag-panel-slate'}`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-orbitron text-[11px] uppercase tracking-[0.16em] text-white/90">
+                    {tag.label}
+                  </span>
+                  <span
+                    className={`h-2 w-2 rounded-full ${tag.tone === 'cyan' ? 'bg-cyan-300 shadow-[0_0_12px_rgba(0,243,255,0.8)]' : tag.tone === 'pink' ? 'bg-pink-400 shadow-[0_0_12px_rgba(255,0,255,0.7)]' : 'bg-slate-300 shadow-[0_0_10px_rgba(255,255,255,0.45)]'}`}
+                  />
+                </div>
+                <span className="mt-2 block font-orbitron text-[10px] tracking-[0.3em] text-slate-500">
+                  {hexCodes[index]}
+                </span>
               </div>
+            ))}
+          </div>
+        </section>
+
+        <section
+          className="glass-panel panel-entity p-8 md:p-12"
+          style={{ transform: `translate3d(${parallax.x * -0.22}px, ${parallax.y * -0.22}px, 0)` }}
+        >
+          <div className="panel-static" />
+          <div className="panel-energy" />
+          <div className="corner-accent left-0 top-0 border-b-0 border-r-0" />
+          <div className="corner-accent bottom-0 right-0 border-l-0 border-t-0" />
+
+          <div className="relative z-10">
+            <div className="mb-8">
+              <h3 className="font-orbitron text-2xl font-bold uppercase tracking-[0.16em] text-cyan-400">
+                {isLogin ? 'Access Your Protocol' : 'Initialize Protocol'}
+              </h3>
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                {isLogin ? 'Authorized Personal Only // 身份验证' : 'Create New Link // 初始化身份'}
+              </p>
             </div>
 
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">设置密码</label>
-              <div className="relative">
-                <input 
-                  type="password" 
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  className={`w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-slate-800 placeholder-slate-400 focus:ring-2 outline-none transition-all font-medium ${isLogin ? 'focus:ring-indigo-500' : 'focus:ring-purple-500'}`}
-                  placeholder="••••••••"
-                  required
-                />
-                <LockIcon className="absolute right-4 top-4 w-5 h-5 text-slate-300" />
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div>
+                <label className="mb-2 block text-xs uppercase tracking-[0.18em] text-slate-400">
+                  Neon ID / Email
+                </label>
+                <div className="input-shell">
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={e => setUsername(e.target.value)}
+                    placeholder="输入您的神经链路标识"
+                    autoComplete="username"
+                    className="cyber-input w-full p-4 text-sm text-white"
+                    required
+                  />
+                </div>
               </div>
-              
-              {/* 注册专属：密码强度提示 */}
+
+              <div>
+                <label className="mb-2 block text-xs uppercase tracking-[0.18em] text-slate-400">
+                  Access Key / Password
+                </label>
+                <div className="input-shell">
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    autoComplete={isLogin ? 'current-password' : 'new-password'}
+                    className="cyber-input w-full p-4 text-sm text-white"
+                    required
+                  />
+                </div>
+              </div>
+
               {!isLogin && (
-                <div className="mt-3 px-1 space-y-2">
-                   <div className="flex gap-1 h-1">
-                      <div className={`flex-1 rounded-full transition-colors ${password.length > 0 ? (passwordCriteria.length ? 'bg-emerald-400' : 'bg-amber-400') : 'bg-slate-200'}`}></div>
-                      <div className={`flex-1 rounded-full transition-colors ${passwordCriteria.length && passwordCriteria.hasNumber ? 'bg-emerald-400' : 'bg-slate-200'}`}></div>
-                      <div className={`flex-1 rounded-full transition-colors ${passwordCriteria.hasSymbol ? 'bg-emerald-400' : 'bg-slate-200'}`}></div>
-                   </div>
-                   <div className="flex flex-wrap gap-x-4 gap-y-1">
-                      <p className={`text-[10px] flex items-center gap-1 font-bold ${passwordCriteria.length ? 'text-emerald-600' : 'text-slate-400'}`}>
-                         {passwordCriteria.length && <CheckCircleIcon className="w-3 h-3" />} 至少8位字符
-                      </p>
-                      <p className={`text-[10px] flex items-center gap-1 font-bold ${passwordCriteria.hasNumber ? 'text-emerald-600' : 'text-slate-400'}`}>
-                         {passwordCriteria.hasNumber && <CheckCircleIcon className="w-3 h-3" />} 包含数字
-                      </p>
-                      <p className={`text-[10px] flex items-center gap-1 font-bold ${passwordCriteria.hasSymbol ? 'text-emerald-600' : 'text-slate-400'}`}>
-                         {passwordCriteria.hasSymbol && <CheckCircleIcon className="w-3 h-3" />} 建议包含符号
-                      </p>
-                   </div>
+                <div className="space-y-2 border-l-2 border-cyan-500/40 pl-4 text-sm text-slate-400">
+                  <p className={passwordCriteria.length ? 'text-cyan-300' : ''}>至少 8 位字符</p>
+                  <p className={passwordCriteria.hasNumber ? 'text-cyan-300' : ''}>至少包含 1 个数字</p>
+                  <p className={passwordCriteria.hasSymbol ? 'text-pink-300' : ''}>建议加入符号增强安全性</p>
                 </div>
               )}
-            </div>
 
-            {error && (
-              <div className="bg-rose-50 border border-rose-100 text-rose-500 text-xs font-bold p-4 rounded-xl animate-shake">
-                 ⚠️ {error}
+              <div className="flex items-center justify-between text-xs">
+                <label className="flex cursor-pointer items-center gap-2 text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={keepLinked}
+                    onChange={e => setKeepLinked(e.target.checked)}
+                    className="accent-cyan-500"
+                  />
+                  {isLogin ? '保持同步链接' : '创建后保持同步链接'}
+                </label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    isLogin
+                      ? setError('暂未开放密钥重置链路。')
+                      : setIsLogin(true)
+                  }
+                  className="text-cyan-400 transition hover:text-pink-500"
+                >
+                  {isLogin ? '丢失密钥？' : '已有协议？'}
+                </button>
               </div>
-            )}
 
-            <button 
-              type="submit" 
-              disabled={loading || (!isLogin && !isPasswordSecure)}
-              className={`w-full font-black py-5 rounded-2xl shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50 disabled:active:scale-100 ${isLogin ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-100' : 'bg-purple-600 hover:bg-purple-700 text-white shadow-purple-100'}`}
-            >
-              {loading ? <Spinner /> : isLogin ? '立即登录' : '创建安全账号'}
-            </button>
-          </form>
-        </div>
+              {error && (
+                <div className="border border-pink-500/30 bg-pink-500/10 px-4 py-3 text-sm text-pink-100 shadow-[0_0_18px_rgba(255,0,255,0.12)]">
+                  {error}
+                </div>
+              )}
 
-        <p className="text-center text-slate-400 text-[10px] mt-8 font-bold uppercase tracking-widest">
-          {isLogin ? '数据采用私有云存储' : '注册即表示您同意隐私保护协议'}
-        </p>
-      </div>
+              <button
+                type="submit"
+                disabled={loading || !isPasswordSecure}
+                className={`btn-scan ${isLogin ? 'btn-scan-cyan shadow-cyan-500/30' : 'btn-scan-pink shadow-pink-500/30'} w-full py-4 font-orbitron text-sm font-bold uppercase tracking-[0.2em] text-white shadow-lg disabled:cursor-not-allowed disabled:opacity-50`}
+              >
+                {loading
+                  ? 'Executing...'
+                  : isLogin
+                    ? 'Submit Protocol'
+                    : 'Create Protocol'}
+              </button>
+            </form>
+
+            <div className="mt-6 border-t border-white/10 pt-6">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLogin(!isLogin);
+                  setError(null);
+                }}
+                className={`protocol-toggle ${isLogin ? 'protocol-toggle-pink' : 'protocol-toggle-cyan'} w-full`}
+              >
+                {isLogin ? 'Initialize Protocol' : 'Return To Access'}
+              </button>
+              <p className="mt-3 text-center text-xs uppercase tracking-[0.2em] text-slate-500">
+                {isLogin ? 'New To The Grid?' : 'Back To Access Your Protocol'}
+              </p>
+            </div>
+          </div>
+        </section>
+      </main>
     </div>
   );
 };
