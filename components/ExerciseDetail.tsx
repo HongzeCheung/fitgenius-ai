@@ -21,7 +21,8 @@ export const ExerciseDetail: React.FC<ExerciseDetailProps> = ({ logs }) => {
   
   useEffect(() => {
     if (allExercises.length > 0 && (!selectedExercise || !allExercises.includes(selectedExercise))) {
-      setSelectedExercise(allExercises[0]);
+      const first = allExercises[0];
+      if (first !== undefined) setSelectedExercise(first);
     }
   }, [allExercises, selectedExercise]);
 
@@ -142,7 +143,11 @@ export const ExerciseDetail: React.FC<ExerciseDetailProps> = ({ logs }) => {
           <h3 className="text-slate-800 font-bold flex items-center gap-2 mb-4 text-sm">
              🔥 技术要点
           </h3>
-          {loadingInsight ? <Spinner /> : (
+          {loadingInsight ? (
+            <Spinner />
+          ) : error ? (
+            <p className="text-rose-600 text-xs font-medium">暂时无法加载洞察，请稍后重试。</p>
+          ) : (
             <ul className="space-y-3">
               {insight?.technicalPoints.map((pt, i) => (
                 <li key={i} className="flex items-start gap-3 text-slate-600 text-xs leading-relaxed font-medium">
@@ -158,7 +163,11 @@ export const ExerciseDetail: React.FC<ExerciseDetailProps> = ({ logs }) => {
           <h3 className="text-slate-800 font-bold flex items-center gap-2 mb-4 text-sm">
              🧬 生理学原理
           </h3>
-          {loadingInsight ? <Spinner /> : (
+          {loadingInsight ? (
+            <Spinner />
+          ) : error ? (
+            <p className="text-rose-600 text-xs font-medium">暂时无法加载洞察，请稍后重试。</p>
+          ) : (
             <p className="text-slate-600 text-xs leading-relaxed font-medium">
               {insight?.physiologicalPrinciple}
             </p>

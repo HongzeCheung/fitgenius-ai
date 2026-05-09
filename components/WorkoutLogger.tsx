@@ -32,7 +32,7 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
   const [title, setTitle] = useState('');
   const [duration, setDuration] = useState('');
   const [calories, setCalories] = useState('');
-  const [notes, setNotes] = useState('');
+  const [notes] = useState('');
   
   const [exerciseType, setExerciseType] = useState<'strength' | 'cardio'>('strength');
   const [exerciseName, setExerciseName] = useState('');
@@ -41,7 +41,9 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
   const [reps, setReps] = useState('');
   const [setsCount, setSetsCount] = useState('');
   
-  const [cardioCategory, setCardioCategory] = useState(CARDIO_CATEGORIES[0].id);
+  const [cardioCategory, setCardioCategory] = useState(
+    CARDIO_CATEGORIES[0]?.id ?? 'running'
+  );
   const [cardioSpeed, setCardioSpeed] = useState('');
   const [cardioIncline, setCardioIncline] = useState('');
   const [cardioLevel, setCardioLevel] = useState('');
@@ -70,17 +72,21 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
         let totalActiveTime = 0;
 
         // 1. 计算所有已录入动作的活跃消耗
+        const fallbackCardio =
+          CARDIO_CATEGORIES[CARDIO_CATEGORIES.length - 1] ?? CARDIO_CATEGORIES[0]!;
         exercises.forEach(ex => {
           if (ex.type === 'cardio') {
-            const cat = CARDIO_CATEGORIES.find(c => c.id === ex.cardioCategory) || CARDIO_CATEGORIES[5];
+            const cat =
+              CARDIO_CATEGORIES.find(c => c.id === ex.cardioCategory) ?? fallbackCardio;
             let met = cat.baseMET;
             const s = ex.sets[0];
-            
+            if (!s) return;
+
             // 根据强度参数微调 MET
             if (ex.cardioCategory === 'running' && s.speed) met += (s.speed - 8) * 0.5;
             if (ex.cardioCategory === 'incline' && s.incline) met += s.incline * 0.4;
             if (ex.cardioCategory === 'stairmaster' && s.level) met += s.level * 0.3;
-            
+
             const d = s.duration || 0;
             totalActiveCalories += met * userWeight * (d / 60);
             totalActiveTime += d;
@@ -113,6 +119,7 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
       
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [duration, userWeight, exercises]);
 
   const addExercise = (e: React.MouseEvent) => {
@@ -167,7 +174,14 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
 
     setIsSubmitting(true);
     try {
-        const [y, m, d] = dateStr.split('-').map(Number);
+        const parts = dateStr.split('-').map(Number);
+        const y = parts[0];
+        const m = parts[1];
+        const d = parts[2];
+        if (y === undefined || m === undefined || d === undefined) {
+          setIsSubmitting(false);
+          return;
+        }
         const now = new Date();
         const finalDate = new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds());
 
@@ -315,20 +329,25 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
 
              {exercises.length > 0 && (
                <div className="mt-4 space-y-2">
-                 {exercises.map((ex, i) => (
+                 {exercises.map((ex, i) => {
+                   const firstSet = ex.sets[0];
+                   return (
                    <div key={i} className="text-xs text-slate-600 bg-white border border-slate-200 px-4 py-3 rounded-2xl flex justify-between shadow-sm items-center animate-fade-in">
                      <span className="font-bold flex items-center gap-2">
                         <span className={`w-1.5 h-1.5 rounded-full ${ex.type === 'strength' ? 'bg-indigo-400' : 'bg-emerald-400'}`}></span>
                         {ex.name}
                      </span>
                      <span className="text-slate-500 font-bold bg-slate-50 px-2 py-1 rounded-lg text-[10px]">
-                        {ex.type === 'strength' 
-                          ? `${ex.sets.length}组 × ${ex.sets[0].reps}次 ${ex.sets[0].weight > 0 ? `@${ex.sets[0].weight}kg` : '(自重)'}`
-                          : `${ex.sets[0].duration} min ${ex.sets[0].speed ? `| ${ex.sets[0].speed}km/h` : ''}${ex.sets[0].incline ? ` | 坡度${ex.sets[0].incline}%` : ''}`
+                        {!firstSet
+                          ? '—'
+                          : ex.type === 'strength'
+                          ? `${ex.sets.length}组 × ${firstSet.reps}次 ${firstSet.weight > 0 ? `@${firstSet.weight}kg` : '(自重)'}`
+                          : `${firstSet.duration ?? 0} min ${firstSet.speed ? `| ${firstSet.speed}km/h` : ''}${firstSet.incline ? ` | 坡度${firstSet.incline}%` : ''}`
                         }
                      </span>
                    </div>
-                 ))}
+                   );
+                 })}
                </div>
              )}
           </div>
