@@ -125,13 +125,14 @@ export const addBreadcrumb = (message: string, category: string, data?: Record<s
 };
 
 /**
- * 性能监控 - 手动事务
+ * 性能监控 - 手动 Span
+ * Sentry v8 使用 startSpan 替代 startTransaction
  */
-export const startTransaction = (name: string, op: string) => {
-  return Sentry.startTransaction({
-    name,
-    op,
-  });
+export const startSpan = <T>(
+  options: { name: string; op: string },
+  callback: (span: Sentry.Span | undefined) => T
+): T => {
+  return Sentry.startSpan(options, callback);
 };
 
 /**
@@ -142,23 +143,24 @@ export const monitorAIRequest = async <T>(
   requestFn: () => Promise<T>,
   metadata?: Record<string, any>
 ): Promise<T> => {
-  const transaction = startTransaction(`ai.${requestName}`, 'ai.request');
-  
-  try {
-    addBreadcrumb(`AI Request: ${requestName}`, 'ai', metadata);
-    const result = await requestFn();
-    transaction.setStatus('ok');
-    return result;
-  } catch (error) {
-    transaction.setStatus('internal_error');
-    captureException(error as Error, {
-      requestName,
-      ...metadata,
-    });
-    throw error;
-  } finally {
-    transaction.finish();
-  }
+  return startSpan(
+    { name: `ai.${requestName}`, op: 'ai.request' },
+    async (span) => {
+      try {
+        addBreadcrumb(`AI Request: ${requestName}`, 'ai', metadata);
+        const result = await requestFn();
+        span?.setStatus({ code: 1 }); // 1 = OK
+        return result;
+      } catch (error) {
+        span?.setStatus({ code: 2 }); // 2 = ERROR
+        captureException(error as Error, {
+          requestName,
+          ...metadata,
+        });
+        throw error;
+      }
+    }
+  );
 };
 
 /**
@@ -168,19 +170,20 @@ export const monitorAPIRequest = async <T>(
   endpoint: string,
   requestFn: () => Promise<T>
 ): Promise<T> => {
-  const transaction = startTransaction(`api.${endpoint}`, 'http.request');
-  
-  try {
-    const result = await requestFn();
-    transaction.setStatus('ok');
-    return result;
-  } catch (error) {
-    transaction.setStatus('internal_error');
-    captureException(error as Error, { endpoint });
-    throw error;
-  } finally {
-    transaction.finish();
-  }
+  return startSpan(
+    { name: `api.${endpoint}`, op: 'http.request' },
+    async (span) => {
+      try {
+        const result = await requestFn();
+        span?.setStatus({ code: 1 }); // 1 = OK
+        return result;
+      } catch (error) {
+        span?.setStatus({ code: 2 }); // 2 = ERROR
+        captureException(error as Error, { endpoint });
+        throw error;
+      }
+    }
+  );
 };
 
 /**
@@ -197,11 +200,21 @@ export const trackUserAction = (action: string, properties?: Record<string, any>
 
 /**
  * 性能指标记录
+ * 使用自定义事件记录性能指标
  */
 export const recordMetric = (name: string, value: number, unit: string = 'ms') => {
-  Sentry.metrics.distribution(name, value, {
+  // 使用 Sentry 的自定义上下文记录性能指标
+  Sentry.setContext('performance', {
+    metric: name,
+    value,
     unit,
-    tags: { environment: ENVIRONMENT },
+    timestamp: Date.now(),
+  });
+  
+  // 也可以作为面包屑记录
+  addBreadcrumb(`Performance: ${name}`, 'performance', {
+    value,
+    unit,
   });
 };
 
@@ -212,7 +225,7 @@ export default {
   captureException,
   captureMessage,
   addBreadcrumb,
-  startTransaction,
+  startSpan,
   monitorAIRequest,
   monitorAPIRequest,
   trackUserAction,

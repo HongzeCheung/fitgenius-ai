@@ -39,7 +39,7 @@ const getPerformanceRating = (name: MetricName, value: number): 'good' | 'needs-
  * 通用指标处理函数
  */
 const handleMetric = (metric: Metric) => {
-  const { name, value, rating, delta, id } = metric;
+  const { name, value, delta, id } = metric;
   
   // 记录到 Sentry
   recordMetric(`web_vitals.${name.toLowerCase()}`, value);
@@ -146,8 +146,8 @@ export const measure = (name: string, startMark: string, endMark: string) => {
     try {
       performance.measure(name, startMark, endMark);
       const measure = performance.getEntriesByName(name)[0];
-      recordMetric(`measure.${name}`, measure.duration);
-      return measure.duration;
+      recordMetric(`measure.${name}`, measure?.duration ?? 0);
+      return measure?.duration ?? 0;
     } catch (error) {
       console.error(`[Performance] Measure failed: ${name}`, error);
     }

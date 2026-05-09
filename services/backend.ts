@@ -8,8 +8,6 @@ import { UserProfile, WorkoutLog, WorkoutPlan } from '../types';
 // ⚠️ 重要提示：
 // 1. 请下载 server.js 和 server-package.json
 // 2. 在本地运行后端服务器 (node server.js)
-// 3. 将下方的 USE_MOCK_BACKEND 改为 false
-const USE_MOCK_BACKEND = false; 
 
 // 你的后端 API 地址
 const API_BASE_URL = 'https://fit-backend-1jpe.onrender.com/api';

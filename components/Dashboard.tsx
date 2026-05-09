@@ -1,6 +1,5 @@
-
 import React, { useMemo } from 'react';
-import { XAxis, YAxis, ResponsiveContainer, RadialBarChart, RadialBar } from 'recharts';
+import { ResponsiveContainer, RadialBarChart, RadialBar } from 'recharts';
 import { WorkoutLog, UserProfile } from '../types';
 import { ActivityIcon } from './Icons';
 
@@ -9,7 +8,7 @@ interface DashboardProps {
   profile: UserProfile;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ logs, profile }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ logs }) => {
   const safeLogs = useMemo(() => (Array.isArray(logs) ? logs : []), [logs]);
   const totalWorkouts = safeLogs.length;
   const totalMinutes = useMemo(
@@ -43,7 +42,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs, profile }) => {
       };
     });
   }, [safeLogs]);
-  const todayStats = chartData[chartData.length - 1];
+  const todayStats = chartData[chartData.length - 1] || { calories: 0, minutes: 0 };
   
   const ringsData = [
     { name: '卡路里', value: Math.min((todayStats.calories / calorieGoal) * 100, 100), fill: '#f97316' },

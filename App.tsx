@@ -184,13 +184,15 @@ const App: React.FC = () => {
             if (existingIndex >= 0) {
                 const updatedLogs = [...prevLogs];
                 const existing = updatedLogs[existingIndex];
-                updatedLogs[existingIndex] = {
-                    ...existing,
-                    duration: (existing.duration || 0) + newLog.duration,
-                    calories: (existing.calories || 0) + newLog.calories,
-                    exercises: [...(existing.exercises || []), ...newLog.exercises],
-                    notes: existing.notes + (newLog.notes ? ` | ${newLog.notes}` : '')
-                };
+                if (existing) {
+                    updatedLogs[existingIndex] = {
+                        ...existing,
+                        duration: (existing.duration || 0) + newLog.duration,
+                        calories: (existing.calories || 0) + newLog.calories,
+                        exercises: [...(existing.exercises || []), ...newLog.exercises],
+                        notes: existing.notes + (newLog.notes ? ` | ${newLog.notes}` : '')
+                    };
+                }
                 return updatedLogs;
             } else {
                 return [newLog, ...prevLogs];

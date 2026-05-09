@@ -30,14 +30,14 @@ function calculateCalories(
   exercises.forEach(ex => {
     if (ex.type === 'cardio') {
       const cat = CARDIO_CATEGORIES.find(c => c.id === ex.cardioCategory) || CARDIO_CATEGORIES[5];
-      let met = cat.baseMET;
+      let met = cat!.baseMET;
       const s = ex.sets[0];
       
-      if (ex.cardioCategory === 'running' && s.speed) met += (s.speed - 8) * 0.5;
-      if (ex.cardioCategory === 'incline' && s.incline) met += s.incline * 0.4;
-      if (ex.cardioCategory === 'stairmaster' && s.level) met += s.level * 0.3;
+      if (ex.cardioCategory === 'running' && s?.speed) met += (s.speed - 8) * 0.5;
+      if (ex.cardioCategory === 'incline' && s?.incline) met += s.incline * 0.4;
+      if (ex.cardioCategory === 'stairmaster' && s?.level) met += s.level * 0.3;
       
-      const d = s.duration || 0;
+      const d = s?.duration || 0;
       totalActiveCalories += met * userWeight * (d / 60);
       totalActiveTime += d;
     } else {
