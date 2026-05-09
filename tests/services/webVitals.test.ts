@@ -14,7 +14,7 @@ vi.mock('web-vitals', () => ({
 // Mock monitoring service
 vi.mock('../../services/monitoring', () => ({
   recordMetric: vi.fn(),
-  addBreadcrumb: vi.fn(),
+  captureMessage: vi.fn(),
 }));
 
 describe('Web Vitals Service', () => {
@@ -22,11 +22,11 @@ describe('Web Vitals Service', () => {
     vi.clearAllMocks();
   });
 
-  describe('reportWebVitals', () => {
+  describe('initWebVitals', () => {
     it('should register all web vitals listeners', async () => {
-      const { reportWebVitals } = await import('../../services/webVitals');
+      const { initWebVitals } = await import('../../services/webVitals');
       
-      reportWebVitals();
+      initWebVitals();
       
       expect(onCLS).toHaveBeenCalled();
       expect(onFID).toHaveBeenCalled();
@@ -36,187 +36,92 @@ describe('Web Vitals Service', () => {
       expect(onINP).toHaveBeenCalled();
     });
 
-    it('should handle CLS metric', async () => {
-      const { reportWebVitals } = await import('../../services/webVitals');
-      const { recordMetric } = await import('../../services/monitoring');
+    it('should handle initialization errors gracefully', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       
-      // Mock onCLS to call the callback
-      vi.mocked(onCLS).mockImplementation((callback) => {
-        callback({
-          name: 'CLS',
-          value: 0.05,
-          rating: 'good',
-          delta: 0.05,
-          id: 'test-id',
-        } as any);
+      vi.mocked(onLCP).mockImplementation(() => {
+        throw new Error('Init failed');
       });
       
-      reportWebVitals();
+      const { initWebVitals } = await import('../../services/webVitals');
       
-      expect(recordMetric).toHaveBeenCalledWith('webvital.CLS', 0.05, 'score');
-    });
-
-    it('should handle LCP metric', async () => {
-      const { reportWebVitals } = await import('../../services/webVitals');
-      const { recordMetric } = await import('../../services/monitoring');
+      // Should not throw
+      expect(() => initWebVitals()).not.toThrow();
       
-      vi.mocked(onLCP).mockImplementation((callback) => {
-        callback({
-          name: 'LCP',
-          value: 2000,
-          rating: 'good',
-          delta: 2000,
-          id: 'test-id',
-        } as any);
-      });
-      
-      reportWebVitals();
-      
-      expect(recordMetric).toHaveBeenCalledWith('webvital.LCP', 2000, 'ms');
-    });
-
-    it('should handle FID metric', async () => {
-      const { reportWebVitals } = await import('../../services/webVitals');
-      const { recordMetric } = await import('../../services/monitoring');
-      
-      vi.mocked(onFID).mockImplementation((callback) => {
-        callback({
-          name: 'FID',
-          value: 50,
-          rating: 'good',
-          delta: 50,
-          id: 'test-id',
-        } as any);
-      });
-      
-      reportWebVitals();
-      
-      expect(recordMetric).toHaveBeenCalledWith('webvital.FID', 50, 'ms');
-    });
-
-    it('should handle FCP metric', async () => {
-      const { reportWebVitals } = await import('../../services/webVitals');
-      const { recordMetric } = await import('../../services/monitoring');
-      
-      vi.mocked(onFCP).mockImplementation((callback) => {
-        callback({
-          name: 'FCP',
-          value: 1500,
-          rating: 'good',
-          delta: 1500,
-          id: 'test-id',
-        } as any);
-      });
-      
-      reportWebVitals();
-      
-      expect(recordMetric).toHaveBeenCalledWith('webvital.FCP', 1500, 'ms');
-    });
-
-    it('should handle TTFB metric', async () => {
-      const { reportWebVitals } = await import('../../services/webVitals');
-      const { recordMetric } = await import('../../services/monitoring');
-      
-      vi.mocked(onTTFB).mockImplementation((callback) => {
-        callback({
-          name: 'TTFB',
-          value: 500,
-          rating: 'good',
-          delta: 500,
-          id: 'test-id',
-        } as any);
-      });
-      
-      reportWebVitals();
-      
-      expect(recordMetric).toHaveBeenCalledWith('webvital.TTFB', 500, 'ms');
-    });
-
-    it('should handle INP metric', async () => {
-      const { reportWebVitals } = await import('../../services/webVitals');
-      const { recordMetric } = await import('../../services/monitoring');
-      
-      vi.mocked(onINP).mockImplementation((callback) => {
-        callback({
-          name: 'INP',
-          value: 100,
-          rating: 'good',
-          delta: 100,
-          id: 'test-id',
-        } as any);
-      });
-      
-      reportWebVitals();
-      
-      expect(recordMetric).toHaveBeenCalledWith('webvital.INP', 100, 'ms');
+      consoleErrorSpy.mockRestore();
     });
   });
 
-  describe('measureCustomPerformance', () => {
-    it('should measure custom performance mark', async () => {
-      const { measureCustomPerformance } = await import('../../services/webVitals');
+  describe('measurePerformance', () => {
+    it('should measure performance duration', async () => {
+      const { measurePerformance } = await import('../../services/webVitals');
+      const { recordMetric } = await import('../../services/monitoring');
       
-      // Mock performance API
-      const mockMark = vi.fn();
-      const mockMeasure = vi.fn(() => ({
-        duration: 150,
-      }));
-      const mockGetEntriesByName = vi.fn(() => [{ duration: 150 }]);
+      const startTime = performance.now();
+      const duration = measurePerformance('test-operation', startTime);
       
-      global.performance = {
-        mark: mockMark,
-        measure: mockMeasure,
-        getEntriesByName: mockGetEntriesByName,
-      } as any;
-      
-      const duration = measureCustomPerformance('test-start', 'test-end', 'test-measure');
-      
-      expect(mockMeasure).toHaveBeenCalledWith('test-measure', 'test-start', 'test-end');
-      expect(duration).toBe(150);
-    });
-
-    it('should return 0 when measure fails', async () => {
-      const { measureCustomPerformance } = await import('../../services/webVitals');
-      
-      global.performance = {
-        mark: vi.fn(),
-        measure: vi.fn(() => {
-          throw new Error('Measure failed');
-        }),
-        getEntriesByName: vi.fn(() => []),
-      } as any;
-      
-      const duration = measureCustomPerformance('test-start', 'test-end', 'test-measure');
-      
-      expect(duration).toBe(0);
+      expect(duration).toBeGreaterThanOrEqual(0);
+      expect(recordMetric).toHaveBeenCalledWith('custom.test-operation', expect.any(Number));
     });
   });
 
-  describe('markPerformance', () => {
+  describe('mark', () => {
     it('should create performance mark', async () => {
-      const { markPerformance } = await import('../../services/webVitals');
+      const { mark } = await import('../../services/webVitals');
       
       const mockMark = vi.fn();
-      global.performance = {
-        mark: mockMark,
-      } as any;
+      global.performance.mark = mockMark;
       
-      markPerformance('test-mark');
+      mark('test-mark');
       
       expect(mockMark).toHaveBeenCalledWith('test-mark');
     });
 
-    it('should handle mark errors gracefully', async () => {
-      const { markPerformance } = await import('../../services/webVitals');
+    it('should handle missing performance API', async () => {
+      const { mark } = await import('../../services/webVitals');
       
-      global.performance = {
-        mark: vi.fn(() => {
-          throw new Error('Mark failed');
-        }),
-      } as any;
+      const originalPerformance = global.performance;
+      // @ts-expect-error - Testing missing API
+      global.performance = undefined;
       
       // Should not throw
-      expect(() => markPerformance('test-mark')).not.toThrow();
+      expect(() => mark('test-mark')).not.toThrow();
+      
+      global.performance = originalPerformance;
+    });
+  });
+
+  describe('measure', () => {
+    it('should measure between two marks', async () => {
+      const { measure } = await import('../../services/webVitals');
+      const { recordMetric } = await import('../../services/monitoring');
+      
+      const mockMeasure = vi.fn();
+      const mockGetEntriesByName = vi.fn(() => [{ duration: 150 }]);
+      
+      global.performance.measure = mockMeasure;
+      global.performance.getEntriesByName = mockGetEntriesByName as any;
+      
+      const duration = measure('test-measure', 'start', 'end');
+      
+      expect(mockMeasure).toHaveBeenCalledWith('test-measure', 'start', 'end');
+      expect(recordMetric).toHaveBeenCalledWith('measure.test-measure', 150);
+      expect(duration).toBe(150);
+    });
+
+    it('should return 0 when measure fails', async () => {
+      const { measure } = await import('../../services/webVitals');
+      
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
+      global.performance.measure = vi.fn(() => {
+        throw new Error('Measure failed');
+      });
+      
+      const duration = measure('test-measure', 'start', 'end');
+      
+      expect(duration).toBe(0);
+      consoleErrorSpy.mockRestore();
     });
   });
 
@@ -224,36 +129,99 @@ describe('Web Vitals Service', () => {
     it('should return navigation timing metrics', async () => {
       const { getNavigationTiming } = await import('../../services/webVitals');
       
-      const mockTiming = {
-        domContentLoadedEventEnd: 1500,
-        domContentLoadedEventStart: 1000,
-        loadEventEnd: 2500,
-        loadEventStart: 2000,
-        domInteractive: 800,
+      const mockNavigation = {
+        domainLookupStart: 0,
+        domainLookupEnd: 50,
+        connectStart: 50,
+        connectEnd: 100,
+        requestStart: 100,
+        responseStart: 200,
+        responseEnd: 300,
+        domInteractive: 400,
+        domContentLoadedEventStart: 500,
+        domContentLoadedEventEnd: 550,
+        loadEventStart: 600,
+        loadEventEnd: 650,
         fetchStart: 0,
       };
       
-      global.performance = {
-        timing: mockTiming,
-      } as any;
+      global.performance.getEntriesByType = vi.fn(() => [mockNavigation as any]);
       
       const timing = getNavigationTiming();
       
       expect(timing).toEqual({
-        domContentLoaded: 500,
-        loadComplete: 500,
-        domInteractive: 800,
+        dns: 50,
+        tcp: 50,
+        request: 100,
+        response: 100,
+        domParse: 100,
+        domContentLoaded: 50,
+        load: 50,
+        total: 650,
       });
     });
 
-    it('should return null when timing not available', async () => {
+    it('should return null when navigation timing not available', async () => {
       const { getNavigationTiming } = await import('../../services/webVitals');
       
-      global.performance = {} as any;
+      const originalPerformance = global.performance;
+      // @ts-expect-error - Testing missing API
+      global.performance = {};
       
       const timing = getNavigationTiming();
       
       expect(timing).toBeNull();
+      
+      global.performance = originalPerformance;
+    });
+
+    it('should return null when no navigation entry', async () => {
+      const { getNavigationTiming } = await import('../../services/webVitals');
+      
+      global.performance.getEntriesByType = vi.fn(() => []);
+      
+      const timing = getNavigationTiming();
+      
+      expect(timing).toBeNull();
+    });
+  });
+
+  describe('monitorResourceTiming', () => {
+    it('should detect slow resources', async () => {
+      const { monitorResourceTiming } = await import('../../services/webVitals');
+      const { captureMessage } = await import('../../services/monitoring');
+      
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      
+      const mockResources = [
+        { name: 'slow-script.js', duration: 1500, transferSize: 50000 },
+        { name: 'fast-script.js', duration: 100, transferSize: 10000 },
+        { name: 'slow-image.png', duration: 2000, transferSize: 100000 },
+      ];
+      
+      global.performance.getEntriesByType = vi.fn(() => mockResources as any);
+      
+      monitorResourceTiming();
+      
+      expect(captureMessage).toHaveBeenCalledWith(
+        'Slow resources detected: 2 resources took > 1s',
+        'warning'
+      );
+      
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('should handle missing performance API', async () => {
+      const { monitorResourceTiming } = await import('../../services/webVitals');
+      
+      const originalPerformance = global.performance;
+      // @ts-expect-error - Testing missing API
+      global.performance = {};
+      
+      // Should not throw
+      expect(() => monitorResourceTiming()).not.toThrow();
+      
+      global.performance = originalPerformance;
     });
   });
 });

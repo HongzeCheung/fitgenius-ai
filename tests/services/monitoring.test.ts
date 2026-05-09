@@ -8,7 +8,10 @@ vi.mock('@sentry/react', () => ({
   captureException: vi.fn(),
   captureMessage: vi.fn(),
   addBreadcrumb: vi.fn(),
-  startSpan: vi.fn((options, callback) => callback(undefined)),
+  startSpan: vi.fn((options, callback) => {
+    void options; // 使用 void 操作符标记为已使用
+    return callback(undefined);
+  }),
   setContext: vi.fn(),
   browserTracingIntegration: vi.fn(() => ({})),
   replayIntegration: vi.fn(() => ({})),
