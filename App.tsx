@@ -4,6 +4,8 @@ import { WorkoutLog, UserProfile, GoalType } from './types';
 import { HomeIcon, DumbbellIcon, BrainIcon, UserIcon, PlusIcon, CloseIcon, CloudIcon, SyncIcon, CheckCircleIcon, AnalysisIcon, LogOutIcon, GithubIcon } from './components/Icons';
 import { backend } from './services/backend';
 import { Spinner } from './components/Spinner';
+import { initMonitoring, setUser, clearUser, trackUserAction } from './services/monitoring';
+import { initWebVitals } from './services/webVitals';
 
 const Dashboard = lazy(() => import('./components/Dashboard').then(module => ({ default: module.Dashboard })));
 const WorkoutLogger = lazy(() => import('./components/WorkoutLogger').then(module => ({ default: module.WorkoutLogger })));
@@ -31,6 +33,12 @@ const matrixColumns = Array.from({ length: 16 }, (_, index) => ({
 
 const App: React.FC = () => {
   const hasStoredToken = backend.hasToken();
+
+  // 初始化监控 (仅执行一次)
+  useEffect(() => {
+    initMonitoring();
+    initWebVitals();
+  }, []);
 
   // State
   const [isAuthenticated, setIsAuthenticated] = useState(hasStoredToken);
@@ -130,10 +138,26 @@ const App: React.FC = () => {
     setIsAuthenticated(true);
     setActiveView('dashboard');
     setIsEntryTransitionActive(true);
+    
+    // 设置用户上下文用于监控
+    const token = backend.hasToken();
+    if (token) {
+      setUser('user_' + Date.now(), profile.name);
+    }
+    
+    // 追踪登录事件
+    trackUserAction('user_login', { timestamp: new Date().toISOString() });
+    
     void hydrateSessionData();
   };
 
   const handleLogout = () => {
+    // 追踪登出事件
+    trackUserAction('user_logout');
+    
+    // 清除监控用户上下文
+    clearUser();
+    
     backend.logout();
     setIsAuthenticated(false);
     setLogs([]);
@@ -142,6 +166,14 @@ const App: React.FC = () => {
 
   const handleAddLog = async (newLog: WorkoutLog) => {
     setSyncStatus('syncing');
+    
+    // 追踪训练记录添加
+    trackUserAction('workout_log_added', {
+      duration: newLog.duration,
+      calories: newLog.calories,
+      exerciseCount: newLog.exercises.length,
+    });
+    
     try {
         await backend.addWorkoutLog(newLog);
         

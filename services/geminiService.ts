@@ -10,6 +10,8 @@ import {
   CoachConversationMessage,
   CoachChatResponse
 } from "../types";
+import { monitorAIRequest, captureException } from "./monitoring";
+import { mark, measure } from "./webVitals";
 
 // Helper to get a fresh instance with the current key
 const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -204,22 +206,31 @@ export const generateFitnessPlan = async (profile: UserProfile): Promise<Workout
   const cached = Cache.get(cacheKey);
   if (cached) return cached;
 
-  return callWithRetry(async () => {
-    const ai = getAI();
-    const prompt = `你是一位专业的健身教练。请为健身水平为${profile.fitnessLevel}、体重${profile.weight}kg、身高${profile.height}cm、目标为${profile.goal}的用户制定一个为期7天的健身计划。所有回复内容必须完全使用中文。`;
-    const response = await ai.models.generateContent({
-      model: DEFAULT_MODEL,
-      contents: [{ parts: [{ text: prompt }] }],
-      config: { responseMimeType: "application/json", responseSchema: planSchema }
-    });
+  return monitorAIRequest('generateFitnessPlan', async () => {
+    mark('ai_plan_start');
+    
+    return callWithRetry(async () => {
+      const ai = getAI();
+      const prompt = `你是一位专业的健身教练。请为健身水平为${profile.fitnessLevel}、体重${profile.weight}kg、身高${profile.height}cm、目标为${profile.goal}的用户制定一个为期7天的健身计划。所有回复内容必须完全使用中文。`;
+      const response = await ai.models.generateContent({
+        model: DEFAULT_MODEL,
+        contents: [{ parts: [{ text: prompt }] }],
+        config: { responseMimeType: "application/json", responseSchema: planSchema }
+      });
 
-    if (response.text) {
-      const result = { ...JSON.parse(response.text), goal: profile.goal };
-      Cache.set(cacheKey, result);
-      return result;
-    }
-    return null;
-  }).catch(() => null);
+      if (response.text) {
+        const result = { ...JSON.parse(response.text), goal: profile.goal };
+        Cache.set(cacheKey, result);
+        measure('ai_plan_duration', 'ai_plan_start', 'ai_plan_end');
+        mark('ai_plan_end');
+        return result;
+      }
+      return null;
+    }).catch((error) => {
+      captureException(error, { function: 'generateFitnessPlan', profile });
+      return null;
+    });
+  }, { goal: profile.goal, level: profile.fitnessLevel });
 };
 
 export const analyzeWorkoutHistory = async (logs: WorkoutLog[], profile: UserProfile): Promise<AIAdvice | null> => {

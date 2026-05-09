@@ -8,6 +8,9 @@ interface AuthProps {
 
 type AuthSequence = 'idle' | 'scanning' | 'breach';
 
+// 性能优化: 轻量级占位背景
+const PLACEHOLDER_GRADIENT = 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #1a1a2e 100%)';
+
 const protocolTags = [
   { label: 'Adaptive Training', tone: 'cyan' },
   { label: 'AI Coaching', tone: 'pink' },
@@ -34,6 +37,9 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
   const [keepLinked, setKeepLinked] = useState(true);
   const [parallax, setParallax] = useState({ x: 0, y: 0 });
   const [hexCodes, setHexCodes] = useState(() => protocolTags.map(() => createHexCode()));
+  
+  // 性能优化: 渐进式图片加载
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   const passwordCriteria = useMemo(
     () => ({
@@ -45,6 +51,19 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
   );
 
   const isPasswordSecure = isLogin ? true : passwordCriteria.length && passwordCriteria.hasNumber;
+
+  // 性能优化: 异步加载背景图片
+  useEffect(() => {
+    const img = new Image();
+    img.src = backgroundImage;
+    img.onload = () => {
+      setImageLoaded(true);
+      console.log('[Performance] Background image loaded');
+    };
+    img.onerror = () => {
+      console.warn('[Performance] Background image failed to load, using placeholder');
+    };
+  }, []);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -131,8 +150,11 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
         style={{ transform: `translate3d(${parallax.x * -0.3}px, ${parallax.y * -0.3}px, 0) scale(1.05)` }}
       >
         <div
-          className={`auth-background-layer h-full w-full bg-cover bg-center bg-no-repeat ${isProtocolArmed ? `auth-background-layer-${authSequence}` : ''}`}
-          style={{ backgroundImage: `url(${backgroundImage})` }}
+          className={`auth-background-layer h-full w-full bg-cover bg-center bg-no-repeat transition-all duration-700 ${isProtocolArmed ? `auth-background-layer-${authSequence}` : ''}`}
+          style={{ 
+            backgroundImage: imageLoaded ? `url(${backgroundImage})` : PLACEHOLDER_GRADIENT,
+            opacity: imageLoaded ? 1 : 0.95
+          }}
         />
       </div>
       <div
