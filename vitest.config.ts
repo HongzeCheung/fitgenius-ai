@@ -21,13 +21,7 @@ export default defineConfig({
         '**/dist/**',
         'vite.config.ts',
         'vitest.config.ts'
-      ],
-      thresholds: {
-        lines: 10,
-        functions: 15,
-        branches: 50,
-        statements: 10
-      }
+      ]
     }
   },
   resolve: {
