@@ -12,7 +12,6 @@ export const ExerciseDetail: React.FC<ExerciseDetailProps> = ({ logs }) => {
   const [selectedExercise, setSelectedExercise] = useState<string>('');
   const [insight, setInsight] = useState<ExerciseInsight | null>(null);
   const [loadingInsight, setLoadingInsight] = useState(false);
-  const [error, setError] = useState(false);
 
   const allExercises = useMemo(
     () => Array.from(new Set((logs || []).flatMap(log => (log.exercises || []).map(e => e.name)))),
@@ -30,11 +29,9 @@ export const ExerciseDetail: React.FC<ExerciseDetailProps> = ({ logs }) => {
     if (!selectedExercise) return;
     const fetchInsight = async () => {
       setLoadingInsight(true);
-      setError(false);
       setInsight(null);
       const data = await getExerciseInsight(selectedExercise);
       if (data) setInsight(data);
-      else setError(true);
       setLoadingInsight(false);
     };
     fetchInsight();
@@ -145,7 +142,7 @@ export const ExerciseDetail: React.FC<ExerciseDetailProps> = ({ logs }) => {
           </h3>
           {loadingInsight ? (
             <Spinner />
-          ) : error ? (
+          ) : !insight ? (
             <p className="text-rose-600 text-xs font-medium">暂时无法加载洞察，请稍后重试。</p>
           ) : (
             <ul className="space-y-3">
@@ -165,7 +162,7 @@ export const ExerciseDetail: React.FC<ExerciseDetailProps> = ({ logs }) => {
           </h3>
           {loadingInsight ? (
             <Spinner />
-          ) : error ? (
+          ) : !insight ? (
             <p className="text-rose-600 text-xs font-medium">暂时无法加载洞察，请稍后重试。</p>
           ) : (
             <p className="text-slate-600 text-xs leading-relaxed font-medium">

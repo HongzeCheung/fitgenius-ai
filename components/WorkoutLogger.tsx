@@ -32,7 +32,6 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
   const [title, setTitle] = useState('');
   const [duration, setDuration] = useState('');
   const [calories, setCalories] = useState('');
-  const [notes] = useState('');
   
   const [exerciseType, setExerciseType] = useState<'strength' | 'cardio'>('strength');
   const [exerciseName, setExerciseName] = useState('');
@@ -41,9 +40,7 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
   const [reps, setReps] = useState('');
   const [setsCount, setSetsCount] = useState('');
   
-  const [cardioCategory, setCardioCategory] = useState(
-    CARDIO_CATEGORIES[0]?.id ?? 'running'
-  );
+  const [cardioCategory, setCardioCategory] = useState(CARDIO_CATEGORIES[0]?.id || 'running');
   const [cardioSpeed, setCardioSpeed] = useState('');
   const [cardioIncline, setCardioIncline] = useState('');
   const [cardioLevel, setCardioLevel] = useState('');
@@ -55,7 +52,7 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
   const isManualCalorieRef = useRef(false);
   const [isCalculating, setIsCalculating] = useState(false);
 
-  const handleNumericInput = (value: string, setter: (v: string) => void, allowFloat = false) => {
+  const handleNumericInput = (value: string, setter: (v: string) => void, allowFloat = false): void => {
     const regex = allowFloat ? /^\d*\.?\d*$/ : /^\d*$/;
     if (regex.test(value)) {
       setter(value);
@@ -72,22 +69,18 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
         let totalActiveTime = 0;
 
         // 1. 计算所有已录入动作的活跃消耗
-        const fallbackCardio =
-          CARDIO_CATEGORIES[CARDIO_CATEGORIES.length - 1] ?? CARDIO_CATEGORIES[0]!;
         exercises.forEach(ex => {
           if (ex.type === 'cardio') {
-            const cat =
-              CARDIO_CATEGORIES.find(c => c.id === ex.cardioCategory) ?? fallbackCardio;
-            let met = cat.baseMET;
+            const cat = CARDIO_CATEGORIES.find(c => c.id === ex.cardioCategory) || CARDIO_CATEGORIES[5];
+            let met = cat!.baseMET;
             const s = ex.sets[0];
-            if (!s) return;
-
+            
             // 根据强度参数微调 MET
-            if (ex.cardioCategory === 'running' && s.speed) met += (s.speed - 8) * 0.5;
-            if (ex.cardioCategory === 'incline' && s.incline) met += s.incline * 0.4;
-            if (ex.cardioCategory === 'stairmaster' && s.level) met += s.level * 0.3;
-
-            const d = s.duration || 0;
+            if (ex.cardioCategory === 'running' && s?.speed) met += (s.speed - 8) * 0.5;
+            if (ex.cardioCategory === 'incline' && s?.incline) met += s.incline * 0.4;
+            if (ex.cardioCategory === 'stairmaster' && s?.level) met += s.level * 0.3;
+            
+            const d = s?.duration || 0;
             totalActiveCalories += met * userWeight * (d / 60);
             totalActiveTime += d;
           } else {
@@ -141,7 +134,8 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
       setDuration((currentDur + (parseInt(setsCount) * STRENGTH_SET_DURATION)).toString());
     } else {
       if (!exDuration) return;
-      const cat = CARDIO_CATEGORIES.find(c => c.id === cardioCategory)!;
+      const cat = CARDIO_CATEGORIES.find(c => c.id === cardioCategory);
+      if (!cat) return;
       const sets: ExerciseSet[] = [{
         weight: 0,
         reps: 0,
@@ -175,13 +169,9 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
     setIsSubmitting(true);
     try {
         const parts = dateStr.split('-').map(Number);
-        const y = parts[0];
-        const m = parts[1];
-        const d = parts[2];
-        if (y === undefined || m === undefined || d === undefined) {
-          setIsSubmitting(false);
-          return;
-        }
+        const y = parts[0] ?? new Date().getFullYear();
+        const m = parts[1] ?? new Date().getMonth() + 1;
+        const d = parts[2] ?? new Date().getDate();
         const now = new Date();
         const finalDate = new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds());
 
@@ -191,7 +181,7 @@ export const WorkoutLogger: React.FC<WorkoutLoggerProps> = ({ onAddLog, onClose,
           title,
           duration: parseInt(duration),
           calories: parseInt(calories) || 0,
-          notes,
+          notes: '',
           exercises: exercises
         };
 
