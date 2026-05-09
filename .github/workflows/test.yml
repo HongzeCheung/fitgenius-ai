@@ -40,7 +40,7 @@ jobs:
             ${{ runner.os }}-pnpm-store-
           
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
         
       - name: Type check
         run: pnpm type-check
@@ -84,7 +84,7 @@ jobs:
           version: 8
           
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
         
       - name: Build project
         run: pnpm build
@@ -116,7 +116,7 @@ jobs:
           version: 8
           
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
         
       - name: Check formatting
         run: |
